@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Sandip Gangdhar</title>
+  <title>Sandip Gangdhar | Cloud Architecture, Kubernetes & Networking</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Personal website and technical blog of Sandip Gangdhar covering Kubernetes, cloud architecture, networking, platform engineering and automation.">
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 
@@ -27,7 +28,7 @@
       grid-template-columns: 1fr 380px;
       gap: 48px;
       align-items: center;
-      min-height: 80vh;
+      min-height: 78vh;
     }
 
     .badge {
@@ -36,7 +37,7 @@
       color: #4338ca;
       padding: 8px 14px;
       border-radius: 999px;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 14px;
       margin-bottom: 18px;
     }
@@ -45,16 +46,22 @@
       font-size: 56px;
       line-height: 1.1;
       margin: 0 0 16px;
+      letter-spacing: -1px;
     }
 
     h2 {
-      font-size: 28px;
+      font-size: 30px;
       margin-top: 0;
       color: #334155;
     }
 
+    h3 {
+      color: #172033;
+    }
+
     p {
       font-size: 18px;
+      color: #334155;
     }
 
     .links a {
@@ -66,7 +73,7 @@
       background: #172033;
       color: white;
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .links a.secondary {
@@ -84,7 +91,7 @@
     .section {
       background: white;
       border-radius: 24px;
-      padding: 32px;
+      padding: 36px;
       margin-top: 28px;
       box-shadow: 0 10px 30px rgba(15,23,42,0.06);
     }
@@ -100,16 +107,40 @@
       border-radius: 18px;
       padding: 22px;
       background: #ffffff;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(15,23,42,0.12);
     }
 
     .card h3 {
       margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 21px;
+    }
+
+    .card p {
+      margin-bottom: 0;
+      font-size: 16px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #4338ca;
     }
 
     footer {
       text-align: center;
       padding: 32px;
       color: #64748b;
+      font-size: 14px;
     }
 
     @media (max-width: 800px) {
@@ -120,6 +151,10 @@
 
       h1 {
         font-size: 40px;
+      }
+
+      h2 {
+        font-size: 24px;
       }
 
       .grid {
@@ -134,7 +169,7 @@
 
     <section class="hero">
       <div>
-        <div class="badge">Cloud Architecture • Kubernetes • Networking</div>
+        <div class="badge">Cloud Architecture • Kubernetes • Networking • Automation</div>
 
         <h1>Sandip Gangdhar</h1>
 
@@ -151,14 +186,14 @@
         </p>
 
         <div class="links">
-          <a href="https://www.linkedin.com/in/sandipgangdhar">LinkedIn</a>
-          <a href="https://github.com/sandipgangdhar" class="secondary">GitHub</a>
-          <a href="https://medium.com/@sandip.gangdhar" class="secondary">Medium</a>
+          <a href="https://www.linkedin.com/in/sandipgangdhar" target="_blank">LinkedIn</a>
+          <a href="https://github.com/sandipgangdhar" target="_blank" class="secondary">GitHub</a>
+          <a href="https://medium.com/@sandip.gangdhar" target="_blank" class="secondary">Medium</a>
         </div>
       </div>
 
       <div>
-        <img src="sandip-gangdhar.png" alt="Sandip Gangdhar" class="profile-img">
+        <img src="sandip-gangdhar.png" alt="Sandip Gangdhar speaking at a cloud technology event" class="profile-img">
       </div>
     </section>
 
@@ -166,25 +201,61 @@
       <h2>Featured Projects</h2>
 
       <div class="grid">
-        <div class="card">
-          <h3>Linode LKE Private Network Automation</h3>
-          <p>Automation framework for private networking, VLAN attachment and Kubernetes node routing.</p>
-        </div>
 
-        <div class="card">
-          <h3>HA NAT Gateway</h3>
-          <p>Enterprise-grade NAT gateway design with high availability, failover and observability.</p>
-        </div>
-
-        <div class="card">
+        <a class="card" href="https://github.com/sandipgangdhar/lke-e-acl-operator" target="_blank">
           <h3>LKE-E ACL Operator</h3>
-          <p>Kubernetes automation for managing dynamic Control Plane ACL updates.</p>
-        </div>
+          <p>Enterprise-grade automation for synchronizing LKE-E Control Plane ACLs with active worker node IPs.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
 
-        <div class="card">
-          <h3>GPU Inference on LKE</h3>
-          <p>GPU-enabled Kubernetes demo for AI inference workloads on cloud infrastructure.</p>
-        </div>
+        <a class="card" href="https://github.com/sandipgangdhar/linode-nb-cert-automation" target="_blank">
+          <h3>Linode NodeBalancer Certificate Automation</h3>
+          <p>Automation framework for managing and rotating certificates on Linode NodeBalancers.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/Linode-LKE-Private-Network" target="_blank">
+          <h3>Linode LKE Private Network</h3>
+          <p>Private networking automation for Linode LKE using VLANs, routing and Kubernetes automation.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-lke-voting-app" target="_blank">
+          <h3>Linode LKE Voting App</h3>
+          <p>Demo application for deploying a voting app on LKE with PostgreSQL, Redis and Kubernetes manifests.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-lke-gpu-demo" target="_blank">
+          <h3>Linode LKE GPU Demo</h3>
+          <p>GPU-enabled LKE demo with PyTorch, CUDA inference and Streamlit UI for AI workloads.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-ha-haproxy-loadbalancer" target="_blank">
+          <h3>Linode HA HAProxy Load Balancer</h3>
+          <p>Production-grade highly available HAProxy load balancer design for VM workloads on Linode.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-nat-gateway" target="_blank">
+          <h3>Linode NAT Gateway</h3>
+          <p>Enterprise-grade HA NAT Gateway using Keepalived, nftables, conntrackd and observability tooling.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/LKE-VLAN-automation" target="_blank">
+          <h3>LKE VLAN Automation</h3>
+          <p>Scripts for adding VLAN network connectivity to Linode LKE clusters.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-aws-vpn-setup" target="_blank">
+          <h3>Linode AWS VPN Setup</h3>
+          <p>Scripts and configuration for IPSec VPN setup between Linode and AWS.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
       </div>
     </section>
 
@@ -194,12 +265,16 @@
         I write about Kubernetes, cloud networking, distributed systems,
         platform engineering and real-world architecture lessons.
       </p>
+
+      <div class="links">
+        <a href="https://medium.com/@sandip.gangdhar" target="_blank">Read on Medium</a>
+      </div>
     </section>
 
   </main>
 
   <footer>
-    © 2026 Sandip Gangdhar
+    © 2026 Sandip Gangdhar • sandipgangdhar.com
   </footer>
 </body>
 </html>
