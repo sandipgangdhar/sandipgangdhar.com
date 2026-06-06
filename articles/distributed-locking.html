@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>When One Pod Must Win | Sandip Gangdhar</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta name="description" content="Distributed locking lessons from building Kubernetes automation systems using ConfigMap locking and etcd transactions.">
+  <meta name="keywords" content="Kubernetes distributed locking, ConfigMap locking, etcd lock, Kubernetes automation, platform engineering">
+  <meta name="author" content="Sandip Gangdhar">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NVTN1842XT"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-NVTN1842XT');
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      max-width: 900px;
+      margin: auto;
+      padding: 40px 24px;
+      background: #f7f7fb;
+      color: #172033;
+      line-height: 1.8;
+    }
+
+    article {
+      background: white;
+      padding: 44px;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(15,23,42,0.06);
+    }
+
+    h1 {
+      font-size: 44px;
+      line-height: 1.15;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      margin-top: 40px;
+      color: #334155;
+    }
+
+    p, li {
+      font-size: 18px;
+      color: #334155;
+    }
+
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    pre {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 20px;
+        border-radius: 14px;
+        overflow-x: auto;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    
+    pre code {
+        color: #f8fafc;
+        background: transparent;
+        padding: 0;
+    }
+
+    a {
+      color: #4338ca;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .meta {
+      color: #64748b;
+      font-size: 15px;
+      margin-bottom: 32px;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+
+<a href="/blog.html" class="back-link">← Back to Blog</a>
+
+<article>
+
+<h1>When One Pod Must Win: Distributed Locking Lessons from Building Kubernetes Automation Systems</h1>
+
+<p class="meta">
+By Sandip Gangdhar • Kubernetes • Platform Engineering • Distributed Systems
+</p>
+
+<div style="
+  background:#eef2ff;
+  border-left:4px solid #4338ca;
+  padding:16px;
+  border-radius:12px;
+  margin:24px 0;
+">
+  <strong>Also available on Medium</strong><br>
+  <a href="https://medium.com/@sandip.gangdhar/when-one-pod-must-win-distributed-locking-lessons-from-building-two-production-kubernetes-9c600877415d"
+     target="_blank">
+     When One Pod Must Win: Distributed Locking Lessons from Building Two Production Kubernetes Automation Systems
+  </a>
+</div>
+
+<p>
+In Kubernetes automation, we often deploy multiple pods for high availability. That is usually a good thing.
+But there are certain tasks where only one pod should act at a time.
+</p>
+
+<p>
+Examples include IP allocation, node reboot orchestration, firewall updates, route management,
+certificate rotation, and control plane access-list synchronization. If two pods perform the same
+operation at the same time, the result can be duplicate updates, race conditions, failed automation
+or even service disruption.
+</p>
+
+<h2>The Problem</h2>
+
+<p>
+While building production automation for Kubernetes networking and control plane access management,
+I ran into a common challenge:
+</p>
+
+<p>
+How do we allow multiple pods to run for availability, but ensure that only one pod performs the
+critical operation at any given time?
+</p>
+
+<p>
+This is where distributed locking becomes important.
+</p>
+
+<h2>Approach 1: ConfigMap-Based Locking</h2>
+
+<p>
+The simplest approach is to use a Kubernetes ConfigMap as a lock. A pod tries to create or update
+a lock entry. If the lock is already held by another pod, it waits and retries.
+</p>
+
+<p>
+This approach is easy to understand and works well for simple coordination tasks.
+</p>
+
+<pre><code>lock_holder: worker-node-1
+lock_timestamp: 2026-06-06T12:00:00Z
+</code></pre>
+
+<h3>Where ConfigMap Locking Works Well</h3>
+
+<ul>
+<li>Simple leader election</li>
+<li>Serialized maintenance tasks</li>
+<li>Reboot coordination</li>
+<li>Small automation workflows</li>
+<li>Low-frequency operations</li>
+</ul>
+
+<h3>Limitations</h3>
+
+<ul>
+<li>It requires careful stale-lock handling</li>
+<li>It is not ideal for high-frequency allocation workloads</li>
+<li>Concurrent updates need to be handled carefully</li>
+<li>Failure scenarios must be explicitly designed</li>
+</ul>
+
+<h2>Approach 2: etcd-Based Locking</h2>
+
+<p>
+For more critical workflows, etcd provides stronger primitives for coordination. Since Kubernetes itself
+uses etcd as its backing store, etcd-style compare-and-swap logic is a natural fit for distributed locking.
+</p>
+
+<p>
+In my IP allocation workflow, etcd was a better choice because IP assignment needs atomic behavior.
+Two pods should never allocate the same IP address.
+</p>
+
+<p>
+Using etcd, the lock or allocation state can be written atomically. If the key already exists,
+the operation fails and the system moves to the next available candidate.
+</p>
+
+<h3>Where etcd Works Better</h3>
+
+<ul>
+<li>IP allocation</li>
+<li>High-concurrency workflows</li>
+<li>Stateful automation</li>
+<li>Atomic read/write operations</li>
+<li>Production-grade coordination</li>
+</ul>
+
+<h2>Key Design Lessons</h2>
+
+<h3>1. Lock Ownership Must Be Clear</h3>
+
+<p>
+Every lock should clearly identify who owns it. This can be a pod name, node name or unique instance ID.
+Without ownership metadata, debugging lock issues becomes painful.
+</p>
+
+<h3>2. Always Handle Stale Locks</h3>
+
+<p>
+Pods can crash. Nodes can reboot. Network calls can fail. If a lock is created but never released,
+the automation can stop permanently. Every lock needs a timestamp or lease mechanism.
+</p>
+
+<h3>3. Keep the Locked Section Small</h3>
+
+<p>
+The lock should protect only the critical section. Do not hold a lock while performing long-running
+operations unless absolutely necessary.
+</p>
+
+<h3>4. Make Operations Idempotent</h3>
+
+<p>
+Even with locking, retries will happen. Scripts and APIs should safely handle repeated execution.
+If a route already exists, do not fail. If a firewall rule already exists, skip it. If an IP is already
+marked allocated, do not allocate it again.
+</p>
+
+<h3>5. Logs Matter</h3>
+
+<p>
+Distributed locking issues are difficult to debug without good logs. Each lock attempt should log:
+</p>
+
+<ul>
+<li>Who requested the lock</li>
+<li>Who currently owns the lock</li>
+<li>When the lock was created</li>
+<li>Whether the lock was acquired, skipped or considered stale</li>
+</ul>
+
+<h2>ConfigMap vs etcd: Which One Should You Use?</h2>
+
+<p>
+My general rule is simple:
+</p>
+
+<ul>
+<li>Use ConfigMap locking for simple orchestration and low-frequency coordination.</li>
+<li>Use etcd for atomic state management, IP allocation and high-reliability workflows.</li>
+</ul>
+
+<p>
+ConfigMap locking is easier to implement. etcd is more suitable when correctness matters more than simplicity.
+</p>
+
+<h2>Final Thoughts</h2>
+
+<p>
+Distributed locking is not only a backend engineering concept. It appears frequently in Kubernetes automation,
+especially when infrastructure changes must be serialized.
+</p>
+
+<p>
+If you are building operators, automation controllers, networking tools or platform services, assume that
+multiple pods may try to act at the same time. Design for that from the beginning.
+</p>
+
+<p>
+The best distributed lock is not the most complex one. It is the one that is simple enough to operate,
+safe enough for failure scenarios and reliable enough for the workflow it protects.
+</p>
+
+<p>
+<a href="/blog.html">← Back to Blog</a>
+</p>
+
+</article>
+
+</body>
+</html>
