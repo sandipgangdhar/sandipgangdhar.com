@@ -1,42 +1,205 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sandip Gangdhar</title>
-    <meta charset="UTF-8">
+  <title>Sandip Gangdhar</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      background: #f7f7fb;
+      color: #172033;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 48px 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 48px;
+      align-items: center;
+      min-height: 80vh;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #eef2ff;
+      color: #4338ca;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: 56px;
+      line-height: 1.1;
+      margin: 0 0 16px;
+    }
+
+    h2 {
+      font-size: 28px;
+      margin-top: 0;
+      color: #334155;
+    }
+
+    p {
+      font-size: 18px;
+    }
+
+    .links a {
+      display: inline-block;
+      margin-right: 12px;
+      margin-top: 12px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: #172033;
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .links a.secondary {
+      background: white;
+      color: #172033;
+      border: 1px solid #d0d7e2;
+    }
+
+    .profile-img {
+      width: 100%;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+    }
+
+    .section {
+      background: white;
+      border-radius: 24px;
+      padding: 32px;
+      margin-top: 28px;
+      box-shadow: 0 10px 30px rgba(15,23,42,0.06);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 22px;
+      background: #ffffff;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px;
+      color: #64748b;
+    }
+
+    @media (max-width: 800px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <main class="container">
 
-    <img
-        src="sandip-gangdhar.png"
-        alt="Sandip Gangdhar"
-        width="300">
+    <section class="hero">
+      <div>
+        <div class="badge">Cloud Architecture • Kubernetes • Networking</div>
 
-    <h1>Sandip Gangdhar</h1>
+        <h1>Sandip Gangdhar</h1>
 
-    <h2>Senior Technical Solutions Architect</h2>
+        <h2>Senior Technical Solutions Architect</h2>
 
-    <p>
-        Cloud Architecture |
-        Kubernetes |
-        Networking |
-        Platform Engineering
-    </p>
+        <p>
+          I help organizations design, migrate and operate secure,
+          scalable and automated cloud platforms.
+        </p>
 
-    <h2>About Me</h2>
+        <p>
+          My focus areas include Kubernetes, cloud networking, VPN architectures,
+          NAT gateways, platform engineering and production-grade automation.
+        </p>
 
-    <p>
-        I help organizations design secure,
-        scalable and automated cloud platforms.
-    </p>
+        <div class="links">
+          <a href="https://www.linkedin.com/in/sandipgangdhar">LinkedIn</a>
+          <a href="https://github.com/sandipgangdhar" class="secondary">GitHub</a>
+          <a href="https://medium.com/@sandip.gangdhar" class="secondary">Medium</a>
+        </div>
+      </div>
 
-    <h2>Links</h2>
+      <div>
+        <img src="sandip-gangdhar.png" alt="Sandip Gangdhar" class="profile-img">
+      </div>
+    </section>
 
-    <ul>
-        <li><a href="https://github.com/sandipgangdhar">GitHub</a></li>
-        <li><a href="https://www.linkedin.com/in/sandipgangdhar">LinkedIn</a></li>
-        <li><a href="https://medium.com/@sandip.gangdhar">Medium</a></li>
-    </ul>
+    <section class="section">
+      <h2>Featured Projects</h2>
 
+      <div class="grid">
+        <div class="card">
+          <h3>Linode LKE Private Network Automation</h3>
+          <p>Automation framework for private networking, VLAN attachment and Kubernetes node routing.</p>
+        </div>
+
+        <div class="card">
+          <h3>HA NAT Gateway</h3>
+          <p>Enterprise-grade NAT gateway design with high availability, failover and observability.</p>
+        </div>
+
+        <div class="card">
+          <h3>LKE-E ACL Operator</h3>
+          <p>Kubernetes automation for managing dynamic Control Plane ACL updates.</p>
+        </div>
+
+        <div class="card">
+          <h3>GPU Inference on LKE</h3>
+          <p>GPU-enabled Kubernetes demo for AI inference workloads on cloud infrastructure.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Blog</h2>
+      <p>
+        I write about Kubernetes, cloud networking, distributed systems,
+        platform engineering and real-world architecture lessons.
+      </p>
+    </section>
+
+  </main>
+
+  <footer>
+    © 2026 Sandip Gangdhar
+  </footer>
 </body>
 </html>
