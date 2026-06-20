@@ -132,6 +132,28 @@
   </ul>
   <p>This preserves the VPC-first design while creating an IPv6 path for high-volume same-datacenter traffic. Operationally, this should be rolled out in maintenance windows because interface changes can require the Linode to be shut down and booted again.</p>
 
+  <h3>Manual implementation overview</h3>
+  <p>Before automating the pattern, it is useful to understand the manual change sequence. The exact Cloud Manager screens and API payloads can vary depending on whether the Linode uses the newer Network Interfaces model or the older Configuration Profile interface model, but the intent is the same.</p>
+
+  <ol>
+    <li><strong>Confirm the current network layout.</strong> Identify the web-tier Linode, the VPC interface, whether 1:1 NAT is enabled, and the Application NodeBalancer IPv6 endpoint.</li>
+    <li><strong>Schedule a maintenance window.</strong> Interface changes can require the Linode to be powered off and booted again.</li>
+    <li><strong>Snapshot the current interface state.</strong> Record the VPC interface, NAT setting, firewall association, and current boot configuration before making changes.</li>
+    <li><strong>Add a public interface for IPv6.</strong> The target state is a public interface with IPv6 SLAAC and no public IPv4 address.</li>
+    <li><strong>Preserve or restore VPC behavior.</strong> If the platform temporarily attaches or moves public IPv4 during the change, restore the original VPC and 1:1 NAT settings after the public interface is created.</li>
+    <li><strong>Boot and validate the host.</strong> Confirm the Linode has a public IPv6 address and a default IPv6 route.</li>
+    <li><strong>Update the application path.</strong> Change the web tier, reverse proxy, or service configuration to call the Application NodeBalancer over IPv6.</li>
+    <li><strong>Validate traffic and billing behavior.</strong> Test the IPv6 path and monitor Monthly Network Transfer for the web-tier Linodes.</li>
+  </ol>
+
+  <p>Typical validation commands on the web-tier Linode are:</p>
+
+  <pre><code>ip -6 addr
+ip -6 route
+curl -6 http://[&lt;Application-NodeBalancer-IPv6&gt;]</code></pre>
+
+  <p>For a single server this can be done manually. For a production fleet, the same workflow should be automated so that discovery, snapshots, rollback, and bulk rollout are consistent.</p>
+
   <h2>Target network design</h2>
   <p>The recommended end state adds a dedicated public interface while leaving the VPC interface unchanged:</p>
 
@@ -145,8 +167,26 @@
 
   <p>Applications continue to use VPC networking where appropriate. Load-balancer traffic that previously used NodeBalancer public IPv4 moves to the NodeBalancer public IPv6 endpoint.</p>
 
+  <h2>Security design: public IPv6 without inbound exposure</h2>
+  <p>The first concern with adding a public IPv6 address to a server is usually: <em>does this expose the server directly to the Internet?</em> The recommended design is to treat the new public interface as an outbound-only IPv6 path from the web tier to the Application NodeBalancer.</p>
+
+  <p><strong>Recommended firewall:</strong> <code>IPv6-WebServer-FW</code></p>
+
+  <table>
+    <thead><tr><th>Direction</th><th>Default policy</th><th>Required rule</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Inbound IPv6</td><td><strong>DROP</strong></td><td><strong>DROP ALL</strong></td><td>No inbound Internet traffic should reach the web server over the new public IPv6 interface.</td></tr>
+      <tr><td>Outbound IPv6</td><td><strong>ACCEPT</strong></td><td><strong>ACCEPT</strong></td><td>The web server initiates the connection to the Application NodeBalancer IPv6 endpoint.</td></tr>
+    </tbody>
+  </table>
+
+  <p>No inbound ports need to be opened for this pattern because the connection is initiated by the web server. The Application NodeBalancer sends responses over the already-established connection, and stateful connection tracking allows the return traffic. In other words, the public IPv6 address exists to create an outbound same-datacenter IPv6 path, not to publish a new inbound service.</p>
+
+  <div class="callout">
+    <p><strong>Security posture:</strong> Inbound IPv6 is DROP ALL. Outbound IPv6 is ACCEPT. The server can initiate traffic to the Application NodeBalancer, but direct unsolicited IPv6 traffic from the Internet is blocked.</p>
+  </div>
+
   <h2>Architecture diagrams</h2>
-  <p>The diagrams below are rendered as native HTML blocks instead of Mermaid so they display consistently on the website, GitHub Pages, and mobile browsers.</p>
 
   <h3>Figure 1 — Traffic path and transfer classification</h3>
   <div class="diagram" aria-label="Production traffic path showing external NodeBalancer, web tier, application NodeBalancer, and transfer classification">
@@ -315,7 +355,7 @@ curl -6 http://[&lt;NodeBalancer-IPv6&gt;]</code></pre>
   <p>Monitor Monthly Network Transfer under the Linode Network tab in Cloud Manager to confirm reduced metered egress on web tier instances.</p>
 
   <h2>Open-source automation</h2>
-  <p>Manual interface changes through Cloud Manager do not scale across large fleets or mixed networking models. I published an open-source reference implementation for this workflow:</p>
+  <p>Now that the manual workflow is clear, the next step is automation. Manual interface changes through Cloud Manager are fine for one or two Linodes, but they do not scale across large fleets, mixed networking models, and rollback-sensitive production windows. I published an open-source reference implementation that automates the same workflow:</p>
 
   <p><strong>Repository:</strong> <a href="https://github.com/sandipgangdhar/linode-public-ipv6-interface-automation" target="_blank" rel="noopener">linode-public-ipv6-interface-automation</a></p>
 
