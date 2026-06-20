@@ -8,195 +8,47 @@
   <meta name="keywords" content="Sandip Gangdhar, Kubernetes, Cloud Architecture, Platform Engineering, Networking, DevOps, Linode, Akamai">
   <meta name="author" content="Sandip Gangdhar">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      background: #f7f7fb;
-      color: #172033;
-      line-height: 1.6;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: auto;
-      padding: 48px 24px;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 48px;
-      align-items: center;
-      min-height: 78vh;
-    }
-
-    .badge {
-      display: inline-block;
-      background: #eef2ff;
-      color: #4338ca;
-      padding: 8px 14px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 14px;
-      margin-bottom: 18px;
-    }
-
-    h1 {
-      font-size: 56px;
-      line-height: 1.1;
-      margin: 0 0 16px;
-      letter-spacing: -1px;
-    }
-
-    h2 {
-      font-size: 30px;
-      margin-top: 0;
-      color: #334155;
-    }
-
-    h3 {
-      color: #172033;
-    }
-
-    p {
-      font-size: 18px;
-      color: #334155;
-    }
-
-    .links a {
-      display: inline-block;
-      margin-right: 12px;
-      margin-top: 12px;
-      padding: 12px 18px;
-      border-radius: 10px;
-      background: #172033;
-      color: white;
-      text-decoration: none;
-      font-weight: 700;
-    }
-
-    .links a.secondary {
-      background: white;
-      color: #172033;
-      border: 1px solid #d0d7e2;
-    }
-
-    .profile-img {
-      width: 100%;
-      border-radius: 24px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.18);
-    }
-
-    .section {
-      background: white;
-      border-radius: 24px;
-      padding: 36px;
-      margin-top: 28px;
-      box-shadow: 0 10px 30px rgba(15,23,42,0.06);
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 18px;
-    }
-
-    .card {
-      border: 1px solid #e5e7eb;
-      border-radius: 18px;
-      padding: 22px;
-      background: #ffffff;
-      text-decoration: none;
-      color: inherit;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px rgba(15,23,42,0.12);
-    }
-
-    .card h3 {
-      margin-top: 0;
-      margin-bottom: 10px;
-      font-size: 21px;
-    }
-
-    .card p {
-      margin-bottom: 0;
-      font-size: 16px;
-    }
-
-    .tag {
-      display: inline-block;
-      margin-top: 14px;
-      font-size: 14px;
-      font-weight: 700;
-      color: #4338ca;
-    }
-
-    footer {
-      text-align: center;
-      padding: 32px;
-      color: #64748b;
-      font-size: 14px;
-    }
-
-    @media (max-width: 800px) {
-      .hero {
-        grid-template-columns: 1fr;
-        min-height: auto;
-      }
-
-      h1 {
-        font-size: 40px;
-      }
-
-      h2 {
-        font-size: 24px;
-      }
-
-      .grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    body { font-family: 'Inter', sans-serif; margin: 0; background: #f7f7fb; color: #172033; line-height: 1.6; }
+    .container { max-width: 1100px; margin: auto; padding: 48px 24px; }
+    .hero { display: grid; grid-template-columns: 1fr 380px; gap: 48px; align-items: center; min-height: 78vh; }
+    .badge { display: inline-block; background: #eef2ff; color: #4338ca; padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; margin-bottom: 18px; }
+    h1 { font-size: 56px; line-height: 1.1; margin: 0 0 16px; letter-spacing: -1px; }
+    h2 { font-size: 30px; margin-top: 0; color: #334155; }
+    h3 { color: #172033; }
+    p { font-size: 18px; color: #334155; }
+    .links a { display: inline-block; margin-right: 12px; margin-top: 12px; padding: 12px 18px; border-radius: 10px; background: #172033; color: white; text-decoration: none; font-weight: 700; }
+    .links a.secondary { background: white; color: #172033; border: 1px solid #d0d7e2; }
+    .profile-img { width: 100%; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.18); }
+    .section { background: white; border-radius: 24px; padding: 36px; margin-top: 28px; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 18px; padding: 22px; background: #ffffff; text-decoration: none; color: inherit; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(15,23,42,0.12); }
+    .card h3 { margin-top: 0; margin-bottom: 10px; font-size: 21px; }
+    .card p { margin-bottom: 0; font-size: 16px; }
+    .tag { display: inline-block; margin-top: 14px; font-size: 14px; font-weight: 700; color: #4338ca; }
+    footer { text-align: center; padding: 32px; color: #64748b; font-size: 14px; }
+    @media (max-width: 800px) { .hero { grid-template-columns: 1fr; min-height: auto; } h1 { font-size: 40px; } h2 { font-size: 24px; } .grid { grid-template-columns: 1fr; } }
   </style>
-<!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-NVTN1842XT"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-NVTN1842XT');
-</script>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NVTN1842XT"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-NVTN1842XT');
+  </script>
 </head>
-
 <body>
   <main class="container">
-
     <section class="hero">
       <div>
         <div class="badge">Cloud Architecture • Kubernetes • Networking • Automation</div>
-
         <h1>Sandip Gangdhar</h1>
-
         <h2>Senior Technical Solutions Architect</h2>
-
-        <p>
-          I help organizations design, migrate and operate secure,
-          scalable and automated cloud platforms.
-        </p>
-
-        <p>
-          My focus areas include Kubernetes, cloud networking, VPN architectures,
-          NAT gateways, platform engineering and production-grade automation.
-        </p>
-
+        <p>I help organizations design, migrate and operate secure, scalable and automated cloud platforms.</p>
+        <p>My focus areas include Kubernetes, cloud networking, VPN architectures, NAT gateways, platform engineering and production-grade automation.</p>
         <div class="links">
           <a href="/about.html" class="secondary">About</a>
           <a href="/blog.html" class="secondary">Blog</a>
@@ -205,7 +57,6 @@
           <a href="https://medium.com/@sandip.gangdhar" target="_blank" class="secondary">Medium</a>
         </div>
       </div>
-
       <div>
         <img src="sandip-gangdhar.png" alt="Sandip Gangdhar speaking at a cloud technology event" class="profile-img">
       </div>
@@ -213,12 +64,16 @@
 
     <section class="section">
       <h2>Featured Projects</h2>
-
       <div class="grid">
-
         <a class="card" href="https://github.com/sandipgangdhar/lke-e-acl-operator" target="_blank">
           <h3>LKE-E ACL Operator</h3>
           <p>Enterprise-grade automation for synchronizing LKE-E Control Plane ACLs with active worker node IPs.</p>
+          <span class="tag">View on GitHub →</span>
+        </a>
+
+        <a class="card" href="https://github.com/sandipgangdhar/linode-public-ipv6-interface-automation" target="_blank">
+          <h3>Public IPv6 Interface Automation</h3>
+          <p>Automation for adding IPv6-only public interfaces to VPC Linodes while preserving NAT, private networking, firewall design, dry-run, rollback and fleet operations.</p>
           <span class="tag">View on GitHub →</span>
         </a>
 
@@ -269,26 +124,18 @@
           <p>Scripts and configuration for IPSec VPN setup between Linode and AWS.</p>
           <span class="tag">View on GitHub →</span>
         </a>
-
       </div>
     </section>
 
     <section class="section">
       <h2>Blog</h2>
-      <p>
-        I write about Kubernetes, cloud networking, distributed systems,
-        platform engineering and real-world architecture lessons.
-      </p>
-
+      <p>I write about Kubernetes, cloud networking, distributed systems, platform engineering and real-world architecture lessons.</p>
       <div class="links">
-        <a href="https://medium.com/@sandip.gangdhar" target="_blank">Read on Medium</a>
+        <a href="/blog.html">Read Blog</a>
+        <a href="https://medium.com/@sandip.gangdhar" target="_blank" class="secondary">Read on Medium</a>
       </div>
     </section>
-
   </main>
-
-  <footer>
-    © 2026 Sandip Gangdhar • sandipgangdhar.com
-  </footer>
+  <footer>© 2026 Sandip Gangdhar • sandipgangdhar.com</footer>
 </body>
 </html>
