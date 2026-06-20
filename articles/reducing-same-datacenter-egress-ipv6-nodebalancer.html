@@ -32,11 +32,24 @@
     :not(pre) > code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; color: #334155; }
     ul, ol { padding-left: 1.4rem; }
     footer { margin-top: 48px; color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 24px; }
+    .diagram { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 18px 0 28px; overflow-x: auto; }
+    .flow { display: flex; align-items: stretch; gap: 12px; min-width: 760px; }
+    .box { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px 16px; min-width: 130px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+    .box strong { display: block; color: #0f172a; margin-bottom: 4px; }
+    .box small { color: #64748b; }
+    .arrow { display: flex; align-items: center; color: #64748b; font-weight: 700; min-width: 38px; justify-content: center; }
+    .metered { border-color: #fecaca; background: #fff1f2; }
+    .unmetered { border-color: #bbf7d0; background: #f0fdf4; }
+    .stack { display: grid; gap: 12px; min-width: 760px; }
+    .row { display: grid; grid-template-columns: 210px 1fr 210px; gap: 14px; align-items: center; }
+    .label { font-weight: 700; color: #334155; }
+    .line { border-top: 2px solid #94a3b8; position: relative; min-height: 2px; }
+    .line::after { content: "→"; position: absolute; right: -8px; top: -18px; color: #64748b; font-size: 1.4rem; }
+    .workflow { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; min-width: 760px; }
+    .step { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; }
+    .step span { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; background: #e0f2fe; color: #075985; font-weight: 700; margin-bottom: 8px; }
+    @media (max-width: 700px) { h1 { font-size: 2rem; } .diagram { padding: 14px; } }
   </style>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, theme: 'default' });
-  </script>
 </head>
 <body>
 <main>
@@ -51,13 +64,17 @@
   </div>
 
   <h2>Architecture and business context</h2>
-  <p>A common production layout on Akamai Cloud Compute looks like this:</p>
+  <p>Akamai has historically been known for its globally distributed edge platform: CDN, application delivery, security, and traffic acceleration close to end users. After Akamai acquired Linode, that edge platform was extended with cloud compute primitives such as Linodes, VPCs, NodeBalancers, object storage, Kubernetes, and managed databases. This combination makes it possible to run origin and application workloads closer to Akamai’s delivery platform while keeping architecture patterns familiar to cloud infrastructure teams.</p>
+
+  <p>One common production layout on Akamai Cloud Compute looks like this:</p>
 
   <pre><code>End user → Akamai CDN → Web tier Linode → Internal NodeBalancer → Application tier Linode</code></pre>
 
+  <p>At first glance, this looks like a standard multi-tier architecture: CDN in front, web tier in the middle, and an internal load-balancing layer before the application tier. The important detail is how the web tier reaches that NodeBalancer.</p>
+
   <p>In one customer deployment, an equivalent architecture on another hyperscaler reported approximately <strong>4 TB of daily egress</strong>. On Akamai Cloud Compute, the same workload reported approximately <strong>32 TB of daily egress</strong>. Investigation showed that a significant portion of the delta was not internet-bound traffic from end users, but east-west traffic between web servers and an internal NodeBalancer—traffic the operations team treated as internal.</p>
 
-  <p>The NodeBalancer was reached via its public IPv4 address because NodeBalancers expose public endpoints and do not provide a VPC-private front door comparable to an internal load balancer in some other environments.</p>
+  <p>The NodeBalancer was reached via its public IPv4 address because NodeBalancers expose public endpoints and do not provide a VPC-private front door comparable to an internal load balancer in some other environments. That design detail matters because same-datacenter public IPv4 traffic is classified differently from same-datacenter IPv6, VLAN, private IPv4, or VPC traffic.</p>
 
   <h2>How network transfer is classified</h2>
   <p>Akamai Cloud documents network transfer rules in <a href="https://techdocs.akamai.com/cloud-computing/docs/network-transfer-usage-and-costs" target="_blank" rel="noopener">Network transfer usage and costs</a>. The following summary is relevant to Linode-to-NodeBalancer paths in the same datacenter.</p>
@@ -92,6 +109,15 @@
 
   <p>Without that second interface, applications configured to use the NodeBalancer IPv6 address could not establish connectivity even though the NodeBalancer side was already IPv6-capable.</p>
 
+  <h2>Solution approach</h2>
+  <p>The fix is not to replace the application architecture or move traffic away from NodeBalancers. The fix is to make the web-tier Linodes dual-interface:</p>
+  <ul>
+    <li>Keep the existing VPC interface for private application connectivity and existing NAT behavior.</li>
+    <li>Add a separate public interface only for public IPv6 SLAAC.</li>
+    <li>Update the web tier, reverse proxy, or service configuration so the NodeBalancer hop uses the NodeBalancer IPv6 endpoint instead of its public IPv4 endpoint.</li>
+  </ul>
+  <p>This preserves the VPC-first design while creating an IPv6 path for high-volume same-datacenter traffic. Operationally, this should be rolled out in maintenance windows because interface changes can require the Linode to be shut down and booted again.</p>
+
   <h2>Target network design</h2>
   <p>The recommended end state adds a dedicated public interface while leaving the VPC interface unchanged:</p>
 
@@ -106,56 +132,50 @@
   <p>Applications continue to use VPC networking where appropriate. Load-balancer traffic that previously used NodeBalancer public IPv4 moves to the NodeBalancer public IPv6 endpoint.</p>
 
   <h2>Architecture diagrams</h2>
+  <p>The diagrams below are rendered as native HTML blocks instead of Mermaid so they display consistently on the website, GitHub Pages, and mobile browsers.</p>
 
   <h3>Figure 1 — Traffic path and transfer classification</h3>
-  <pre class="mermaid">flowchart TB
-    User[End user]
-    CDN[CDN edge]
-    VPC1["VPC interface - Private IPv4"]
-    PUB1["Public interface - IPv6 SLAAC"]
-    NB["NodeBalancer - Public IPv4 and IPv6"]
-    APP[Backend Linodes]
-
-    User --> CDN
-    CDN -->|HTTPS| VPC1
-    VPC1 -.->|"Before: metered IPv4"| NB
-    PUB1 -->|"After: unmetered IPv6"| NB
-    NB --> APP
-
-    style VPC1 fill:#fee,stroke:#c33
-    style PUB1 fill:#efe,stroke:#393</pre>
+  <div class="diagram" aria-label="Traffic path showing metered IPv4 before state and unmetered IPv6 after state">
+    <div class="flow">
+      <div class="box"><strong>End user</strong><small>Client traffic</small></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>Akamai CDN</strong><small>Edge delivery</small></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>Web tier Linode</strong><small>Same datacenter</small></div>
+      <div class="arrow">→</div>
+      <div class="box metered"><strong>Before</strong><small>NodeBalancer public IPv4<br />metered transfer</small></div>
+      <div class="arrow">/</div>
+      <div class="box unmetered"><strong>After</strong><small>NodeBalancer public IPv6<br />unmetered same-DC path</small></div>
+      <div class="arrow">→</div>
+      <div class="box"><strong>Application tier</strong><small>Backend Linodes</small></div>
+    </div>
+  </div>
 
   <h3>Figure 2 — Dual-interface Linode target state</h3>
-  <pre class="mermaid">flowchart LR
-    subgraph WebLinode["Web tier Linode"]
-        IF1["Interface 1 VPC - private IPv4, NAT unchanged"]
-        IF2["Interface 2 Public - IPv6 SLAAC only"]
-    end
-    NB["NodeBalancer IPv6 endpoint"]
-    IF2 -->|"Same DC IPv6"| NB</pre>
+  <div class="diagram" aria-label="Dual interface Linode target state">
+    <div class="stack">
+      <div class="row">
+        <div class="box"><strong>Web tier Linode</strong><small>Existing application host</small></div>
+        <div class="line"></div>
+        <div class="box"><strong>VPC interface</strong><small>Private IPv4<br />NAT unchanged</small></div>
+      </div>
+      <div class="row">
+        <div class="box unmetered"><strong>Public interface</strong><small>IPv6 SLAAC only<br />No public IPv4 target state</small></div>
+        <div class="line"></div>
+        <div class="box unmetered"><strong>NodeBalancer</strong><small>Public IPv6 endpoint<br />same datacenter</small></div>
+      </div>
+    </div>
+  </div>
 
   <h3>Figure 3 — Automation workflow high level</h3>
-  <pre class="mermaid">sequenceDiagram
-    participant Op as Operator
-    participant Tool as IPv6 automation
-    participant API as Linode API v4
-    participant VM as Linode instance
-
-    Op->>Tool: Run with LINODE_API_TOKEN
-    Tool->>API: GET instance details
-    API-->>Tool: interface_generation and status
-    Tool->>API: List interfaces
-    Tool->>Tool: Snapshot VPC NAT settings
-
-    alt Instance running
-        Tool->>API: POST shutdown
-        API-->>VM: Power off
-    end
-
-    Tool->>API: Create or adjust interfaces
-    Tool->>API: POST boot
-    API-->>VM: Power on
-    Tool-->>Op: Final state and interface ID</pre>
+  <div class="diagram" aria-label="Automation workflow">
+    <div class="workflow">
+      <div class="step"><span>1</span><strong>Discover</strong><br /><small>Get Linode details, status, config profile, and interface generation.</small></div>
+      <div class="step"><span>2</span><strong>Snapshot</strong><br /><small>Record existing VPC, NAT, interface, and firewall settings before change.</small></div>
+      <div class="step"><span>3</span><strong>Change</strong><br /><small>Power off if needed, add public IPv6 interface, and preserve VPC settings.</small></div>
+      <div class="step"><span>4</span><strong>Validate</strong><br /><small>Boot instance, confirm IPv6 SLAAC, and test NodeBalancer IPv6 reachability.</small></div>
+    </div>
+  </div>
 
   <h2>Technical deep dive</h2>
   <p>Akamai Cloud Compute supports two Linode networking models for interface management. The field <code>interface_generation</code> on the Linode object determines which API surface applies:</p>
@@ -202,15 +222,14 @@
     </tbody>
   </table>
 
-  <pre class="mermaid">flowchart TD
-    A["GET interfaces and snapshot VPC"] --> B{"IPv6-only POST accepted?"}
-    B -->|Yes| C["Create public IPv6 interface - VPC unchanged"]
-    B -->|No| D["PUT disable VPC NAT"]
-    D --> E["POST public interface with temp IPv4"]
-    E --> F["PUT remove public IPv4"]
-    F --> G["PUT restore VPC NAT"]
-    C --> H[Boot instance]
-    G --> H</pre>
+  <div class="diagram">
+    <div class="workflow">
+      <div class="step"><span>1</span><strong>Snapshot</strong><br /><small>List interfaces and save VPC NAT state.</small></div>
+      <div class="step"><span>2</span><strong>Happy path</strong><br /><small>Create public IPv6-only interface. VPC remains unchanged.</small></div>
+      <div class="step"><span>3</span><strong>Fallback</strong><br /><small>If needed, temporarily disable VPC NAT and create public interface.</small></div>
+      <div class="step"><span>4</span><strong>Restore</strong><br /><small>Remove temporary public IPv4 and restore VPC NAT.</small></div>
+    </div>
+  </div>
 
   <h3>Configuration Profile model: <code>interface_generation: legacy_config</code></h3>
   <p>Configuration profiles use a different API tree. Interfaces belong to a config profile, not directly to the Linode root.</p>
@@ -225,11 +244,14 @@
     </tbody>
   </table>
 
-  <pre class="mermaid">flowchart TD
-    A["Resolve configId and snapshot VPC"] --> B["PUT nat_1_1 empty string"]
-    B --> C["POST purpose public"]
-    C --> D["PUT restore VPC NAT from snapshot"]
-    D --> E[Boot instance]</pre>
+  <div class="diagram">
+    <div class="workflow">
+      <div class="step"><span>1</span><strong>Resolve</strong><br /><small>Select config profile and snapshot VPC interface state.</small></div>
+      <div class="step"><span>2</span><strong>Disable NAT</strong><br /><small>Temporarily set <code>nat_1_1</code> to an empty string.</small></div>
+      <div class="step"><span>3</span><strong>Add public</strong><br /><small>Create the public interface on the config profile.</small></div>
+      <div class="step"><span>4</span><strong>Restore</strong><br /><small>Restore VPC NAT from snapshot and boot the instance.</small></div>
+    </div>
+  </div>
 
   <h3>Side-by-side comparison</h3>
   <table>
