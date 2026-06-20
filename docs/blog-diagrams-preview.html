@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPv6 Egress Article Diagrams Preview</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+  </script>
+</head>
+<body>
+  <h1>IPv6 Egress Article Diagrams Preview</h1>
+  <p>Open this file locally to preview Mermaid diagrams used in the article.</p>
+  <h2>Traffic path and transfer classification</h2>
+  <pre class="mermaid">flowchart TB
+    User[End user]
+    CDN[CDN edge]
+    VPC1["VPC interface - Private IPv4"]
+    PUB1["Public interface - IPv6 SLAAC"]
+    NB["NodeBalancer - Public IPv4 and IPv6"]
+    APP[Backend Linodes]
+    User --> CDN
+    CDN -->|HTTPS| VPC1
+    VPC1 -.->|"Before: metered IPv4"| NB
+    PUB1 -->|"After: unmetered IPv6"| NB
+    NB --> APP
+    style VPC1 fill:#fee,stroke:#c33
+    style PUB1 fill:#efe,stroke:#393</pre>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reducing Same-Datacenter Egress: Public IPv6 Between Linodes and NodeBalancers | Sandip Gangdhar</title>
+  <meta name="description" content="How moving same-datacenter Linode-to-NodeBalancer traffic from public IPv4 to public IPv6 can reduce metered network transfer on Akamai Cloud Compute." />
+  <link rel="canonical" href="https://sandipgangdhar.com/articles/reducing-same-datacenter-egress-ipv6-nodebalancer.html" />
+  <meta property="og:title" content="Reducing Same-Datacenter Egress: Public IPv6 Between Linodes and NodeBalancers" />
+  <meta property="og:description" content="A practical architecture pattern and automation workflow for reducing same-datacenter egress on Akamai Cloud Compute." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://sandipgangdhar.com/articles/reducing-same-datacenter-egress-ipv6-nodebalancer.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.7; margin: 0; color: #172033; background: #f8fafc; }
+    main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; background: #fff; }
+    a { color: #0f62fe; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back { display: inline-block; margin-bottom: 24px; color: #475569; }
+    h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 12px; color: #0f172a; }
+    h2 { margin-top: 44px; color: #0f172a; border-top: 1px solid #e2e8f0; padding-top: 28px; }
+    h3 { margin-top: 30px; color: #1e293b; }
+    .meta { color: #64748b; margin-bottom: 24px; }
+    .summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 18px 20px; border-radius: 8px; }
+    .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 16px 18px; border-radius: 8px; }
+    .callout { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px 18px; border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 10px; overflow-x: auto; }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    :not(pre) > code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; color: #334155; }
+    ul, ol { padding-left: 1.4rem; }
+    footer { margin-top: 48px; color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 24px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+  </script>
+</head>
+<body>
+<main>
+  <a class="back" href="../blog.html">← Back to Blog</a>
+
+  <h1>Reducing Same-Datacenter Egress: Public IPv6 Between Linodes and NodeBalancers</h1>
+  <p class="meta">By Sandip Gangdhar • Akamai Cloud Compute • Networking • Cost Optimization • IPv6</p>
+
+  <div class="summary">
+    <p><strong>Audience:</strong> Platform engineers, cloud architects, and operations teams running multi-tier applications on Akamai Cloud Compute.</p>
+    <p><strong>Summary:</strong> When web tier Linodes communicate with an internal NodeBalancer over public IPv4—even within the same datacenter—that traffic can count as metered outbound network transfer. Routing the same hop over public IPv6 in the same datacenter aligns with Akamai’s unmetered transfer policy for that path. VPC-only Linodes do not receive public IPv6 by default, so this article explains the networking constraint, the target architecture, and an open-source automation tool that adds a public IPv6-only interface while preserving VPC settings.</p>
+  </div>
+
+  <h2>Architecture and business context</h2>
+  <p>A common production layout on Akamai Cloud Compute looks like this:</p>
+
+  <pre><code>End user → Akamai CDN → Web tier Linode → Internal NodeBalancer → Application tier Linode</code></pre>
+
+  <p>In one customer deployment, an equivalent architecture on another hyperscaler reported approximately <strong>4 TB of daily egress</strong>. On Akamai Cloud Compute, the same workload reported approximately <strong>32 TB of daily egress</strong>. Investigation showed that a significant portion of the delta was not internet-bound traffic from end users, but east-west traffic between web servers and an internal NodeBalancer—traffic the operations team treated as internal.</p>
+
+  <p>The NodeBalancer was reached via its public IPv4 address because NodeBalancers expose public endpoints and do not provide a VPC-private front door comparable to an internal load balancer in some other environments.</p>
+
+  <h2>How network transfer is classified</h2>
+  <p>Akamai Cloud documents network transfer rules in <a href="https://techdocs.akamai.com/cloud-computing/docs/network-transfer-usage-and-costs" target="_blank" rel="noopener">Network transfer usage and costs</a>. The following summary is relevant to Linode-to-NodeBalancer paths in the same datacenter.</p>
+
+  <h3>Generally unmetered</h3>
+  <ul>
+    <li>All inbound network transfer</li>
+    <li>Outbound transfer from Linodes and NodeBalancers to services in the same datacenter when traffic uses IPv6, private VLAN, or private IPv4 on those services</li>
+    <li>Traffic between resources attached to the same VPC</li>
+  </ul>
+
+  <h3>Metered</h3>
+  <ul>
+    <li>Outbound transfer to destinations outside the origin datacenter</li>
+    <li>Outbound transfer within the same datacenter when a public IPv4 address is used</li>
+    <li>Object Storage egress, where separate rules apply</li>
+  </ul>
+
+  <p>The documentation explicitly excludes public IPv4 from same-datacenter unmetered transfer because of routing behavior. That classification explains how a local hop—web server to NodeBalancer in one region—can still consume metered outbound transfer when addressed via NodeBalancer public IPv4.</p>
+
+  <p>NodeBalancers are equipped with both public IPv4 and IPv6 addresses. Same-datacenter communication over IPv6 between Linodes and NodeBalancers fits the unmetered same-datacenter category described in the network transfer documentation.</p>
+
+  <h2>Problem statement</h2>
+  <p>The customer’s optimization goal was straightforward: <strong>move web-tier to NodeBalancer traffic from public IPv4 to public IPv6</strong> within the same datacenter.</p>
+
+  <p>Implementation encountered a platform constraint:</p>
+  <ul>
+    <li>Most new Linode deployments use a VPC-first network layout for private connectivity.</li>
+    <li>VPC interfaces are designed for private connectivity and do not provide a public IPv6 address by themselves.</li>
+    <li>Public IPv6 is delivered through a separate public interface using SLAAC.</li>
+  </ul>
+
+  <p>Without that second interface, applications configured to use the NodeBalancer IPv6 address could not establish connectivity even though the NodeBalancer side was already IPv6-capable.</p>
+
+  <h2>Target network design</h2>
+  <p>The recommended end state adds a dedicated public interface while leaving the VPC interface unchanged:</p>
+
+  <table>
+    <thead><tr><th>Interface</th><th>Role</th><th>IPv4</th><th>IPv6</th></tr></thead>
+    <tbody>
+      <tr><td><strong>VPC</strong></td><td>Private connectivity and existing NAT policy</td><td>VPC private address</td><td>—</td></tr>
+      <tr><td><strong>Public</strong></td><td>Same-datacenter reachability to NodeBalancer</td><td>None, IPv6-only target state</td><td>SLAAC public IPv6</td></tr>
+    </tbody>
+  </table>
+
+  <p>Applications continue to use VPC networking where appropriate. Load-balancer traffic that previously used NodeBalancer public IPv4 moves to the NodeBalancer public IPv6 endpoint.</p>
+
+  <h2>Architecture diagrams</h2>
+
+  <h3>Figure 1 — Traffic path and transfer classification</h3>
+  <pre class="mermaid">flowchart TB
+    User[End user]
+    CDN[CDN edge]
+    VPC1["VPC interface - Private IPv4"]
+    PUB1["Public interface - IPv6 SLAAC"]
+    NB["NodeBalancer - Public IPv4 and IPv6"]
+    APP[Backend Linodes]
+
+    User --> CDN
+    CDN -->|HTTPS| VPC1
+    VPC1 -.->|"Before: metered IPv4"| NB
+    PUB1 -->|"After: unmetered IPv6"| NB
+    NB --> APP
+
+    style VPC1 fill:#fee,stroke:#c33
+    style PUB1 fill:#efe,stroke:#393</pre>
+
+  <h3>Figure 2 — Dual-interface Linode target state</h3>
+  <pre class="mermaid">flowchart LR
+    subgraph WebLinode["Web tier Linode"]
+        IF1["Interface 1 VPC - private IPv4, NAT unchanged"]
+        IF2["Interface 2 Public - IPv6 SLAAC only"]
+    end
+    NB["NodeBalancer IPv6 endpoint"]
+    IF2 -->|"Same DC IPv6"| NB</pre>
+
+  <h3>Figure 3 — Automation workflow high level</h3>
+  <pre class="mermaid">sequenceDiagram
+    participant Op as Operator
+    participant Tool as IPv6 automation
+    participant API as Linode API v4
+    participant VM as Linode instance
+
+    Op->>Tool: Run with LINODE_API_TOKEN
+    Tool->>API: GET instance details
+    API-->>Tool: interface_generation and status
+    Tool->>API: List interfaces
+    Tool->>Tool: Snapshot VPC NAT settings
+
+    alt Instance running
+        Tool->>API: POST shutdown
+        API-->>VM: Power off
+    end
+
+    Tool->>API: Create or adjust interfaces
+    Tool->>API: POST boot
+    API-->>VM: Power on
+    Tool-->>Op: Final state and interface ID</pre>
+
+  <h2>Technical deep dive</h2>
+  <p>Akamai Cloud Compute supports two Linode networking models for interface management. The field <code>interface_generation</code> on the Linode object determines which API surface applies:</p>
+
+  <table>
+    <thead><tr><th><code>interface_generation</code></th><th>Name</th><th>Primary API base path</th></tr></thead>
+    <tbody>
+      <tr><td><code>linode</code></td><td>Linode Network Interfaces</td><td><code>/v4/linode/instances/{linodeId}/interfaces</code></td></tr>
+      <tr><td><code>legacy_config</code></td><td>Configuration Profile Interfaces</td><td><code>/v4/linode/instances/{linodeId}/configs/{configId}/interfaces</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>Automation should detect this value instead of assuming a single API path. The open-source tool referenced below reads it from <code>GET /linode/instances/{linodeId}</code>.</p>
+
+  <h3>Shared API operations</h3>
+  <table>
+    <thead><tr><th>Operation</th><th>Method</th><th>Path</th></tr></thead>
+    <tbody>
+      <tr><td>Get Linode</td><td><code>GET</code></td><td><code>/linode/instances/{linodeId}</code></td></tr>
+      <tr><td>List configuration profiles</td><td><code>GET</code></td><td><code>/linode/instances/{linodeId}/configs</code></td></tr>
+      <tr><td>Get configuration profile</td><td><code>GET</code></td><td><code>/linode/instances/{linodeId}/configs/{configId}</code></td></tr>
+      <tr><td>Networking / IP summary</td><td><code>GET</code></td><td><code>/linode/instances/{linodeId}/ips</code></td></tr>
+      <tr><td>Shut down</td><td><code>POST</code></td><td><code>/linode/instances/{linodeId}/shutdown</code></td></tr>
+      <tr><td>Boot</td><td><code>POST</code></td><td><code>/linode/instances/{linodeId}/boot</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>Interface changes should be planned as maintenance operations. Production automation should record the prior power state and restore it after changes.</p>
+
+  <h3>Network Interfaces model: <code>interface_generation: linode</code></h3>
+
+  <p><strong>Preferred workflow:</strong> create a public interface with IPv6 SLAAC only. Do not modify the VPC interface or NAT.</p>
+  <p><strong>Legacy fallback:</strong> if the API rejects IPv6-only creation, temporarily disable VPC 1:1 NAT, create a public interface with temporary IPv4, remove public IPv4, and restore VPC NAT from snapshot.</p>
+
+  <table>
+    <thead><tr><th>Step</th><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Create IPv6-only public interface</td><td><code>POST</code></td><td><code>/linode/instances/{linodeId}/interfaces</code></td><td><code>purpose: public</code>, IPv6 SLAAC, empty IPv4</td></tr>
+      <tr><td>Disable VPC 1:1 NAT fallback</td><td><code>PUT</code></td><td><code>/linode/instances/{linodeId}/interfaces/{vpcInterfaceId}</code></td><td>Temporary; snapshot NAT first</td></tr>
+      <tr><td>Create public interface fallback</td><td><code>POST</code></td><td><code>/linode/instances/{linodeId}/interfaces</code></td><td>May attach temporary IPv4</td></tr>
+      <tr><td>Remove public IPv4 fallback</td><td><code>PUT</code></td><td><code>/linode/instances/{linodeId}/interfaces/{publicInterfaceId}</code></td><td>Clear IPv4 addresses</td></tr>
+      <tr><td>Restore VPC settings</td><td><code>PUT</code></td><td><code>/linode/instances/{linodeId}/interfaces/{vpcInterfaceId}</code></td><td>Restore NAT from snapshot</td></tr>
+      <tr><td>Rollback</td><td><code>DELETE</code></td><td><code>/linode/instances/{linodeId}/interfaces/{publicInterfaceId}</code></td><td>Delete public interface after VPC restore if needed</td></tr>
+    </tbody>
+  </table>
+
+  <pre class="mermaid">flowchart TD
+    A["GET interfaces and snapshot VPC"] --> B{"IPv6-only POST accepted?"}
+    B -->|Yes| C["Create public IPv6 interface - VPC unchanged"]
+    B -->|No| D["PUT disable VPC NAT"]
+    D --> E["POST public interface with temp IPv4"]
+    E --> F["PUT remove public IPv4"]
+    F --> G["PUT restore VPC NAT"]
+    C --> H[Boot instance]
+    G --> H</pre>
+
+  <h3>Configuration Profile model: <code>interface_generation: legacy_config</code></h3>
+  <p>Configuration profiles use a different API tree. Interfaces belong to a config profile, not directly to the Linode root.</p>
+
+  <table>
+    <thead><tr><th>Step</th><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Disable VPC 1:1 NAT</td><td><code>PUT</code></td><td><code>/linode/instances/{linodeId}/configs/{configId}/interfaces/{vpcInterfaceId}</code></td><td>Set <code>ipv4.nat_1_1</code> to empty string, not <code>null</code></td></tr>
+      <tr><td>Add public interface</td><td><code>POST</code></td><td><code>/linode/instances/{linodeId}/configs/{configId}/interfaces</code></td><td><code>purpose: public</code></td></tr>
+      <tr><td>Restore VPC / NAT</td><td><code>PUT</code></td><td><code>/linode/instances/{linodeId}/configs/{configId}/interfaces/{vpcInterfaceId}</code></td><td>Reclaim public IPv4 via NAT restore</td></tr>
+      <tr><td>Rollback</td><td><code>DELETE</code></td><td><code>/linode/instances/{linodeId}/configs/{configId}/interfaces/{publicInterfaceId}</code></td><td>Delete public interface on the config profile</td></tr>
+    </tbody>
+  </table>
+
+  <pre class="mermaid">flowchart TD
+    A["Resolve configId and snapshot VPC"] --> B["PUT nat_1_1 empty string"]
+    B --> C["POST purpose public"]
+    C --> D["PUT restore VPC NAT from snapshot"]
+    D --> E[Boot instance]</pre>
+
+  <h3>Side-by-side comparison</h3>
+  <table>
+    <thead><tr><th>Topic</th><th>Network Interfaces <code>linode</code></th><th>Configuration Profile <code>legacy_config</code></th></tr></thead>
+    <tbody>
+      <tr><td>Detection</td><td><code>interface_generation: linode</code></td><td><code>interface_generation: legacy_config</code></td></tr>
+      <tr><td>Interface API</td><td><code>/instances/{id}/interfaces</code></td><td><code>/instances/{id}/configs/{configId}/interfaces</code></td></tr>
+      <tr><td>IPv6-only happy path</td><td>Attempted first</td><td>Not used; legacy flow</td></tr>
+      <tr><td>VPC NAT during create</td><td>Unchanged on happy path</td><td>Temporarily disabled, then restored</td></tr>
+      <tr><td>Public IPv4 removal</td><td>Explicit PUT to clear IPv4 on fallback path</td><td>Reclaimed by restoring VPC 1:1 NAT</td></tr>
+      <tr><td>Cloud Firewall on new public interface</td><td>Supported through interface-level firewall assignment</td><td>Firewall behavior follows configuration profile interface model</td></tr>
+      <tr><td>Multi-profile Linodes</td><td>N/A</td><td>Requires <code>--config-id</code> when auto-selection fails</td></tr>
+      <tr><td>Rollback</td><td>Delete public interface and restore VPC settings</td><td>Delete public interface on config profile and restore VPC settings</td></tr>
+    </tbody>
+  </table>
+
+  <h3>SLAAC and validation</h3>
+  <p>Public IPv6 SLAAC addresses may appear in the API after the instance boots. Post-change validation should include:</p>
+
+  <pre><code>ip -6 addr
+ip -6 route
+curl -6 http://[&lt;NodeBalancer-IPv6&gt;]</code></pre>
+
+  <p>Monitor Monthly Network Transfer under the Linode Network tab in Cloud Manager to confirm reduced metered egress on web tier instances.</p>
+
+  <h2>Open-source automation</h2>
+  <p>Manual interface changes through Cloud Manager do not scale across large fleets or mixed networking models. I published an open-source reference implementation for this workflow:</p>
+
+  <p><strong>Repository:</strong> <a href="https://github.com/sandipgangdhar/linode-public-ipv6-interface-automation" target="_blank" rel="noopener">linode-public-ipv6-interface-automation</a></p>
+
+  <h3>Capabilities</h3>
+  <ul>
+    <li>Auto-detects Network Interfaces vs Configuration Profile APIs</li>
+    <li>Snapshots and restores VPC / 1:1 NAT settings</li>
+    <li>Dry-run mode for change review</li>
+    <li>Bulk execution with CSV input</li>
+    <li>Parallel rollout controls and bulk rate limiting</li>
+    <li>Rollback support</li>
+    <li>Partial-failure recovery, making the workflow safe to re-run</li>
+  </ul>
+
+  <h3>Example commands</h3>
+  <p><strong>Single instance dry-run:</strong></p>
+  <pre><code>export LINODE_API_TOKEN='…'
+python3 linode_add_public_ipv6_interface.py \
+  --linode-id 88899084 \
+  --dry-run</code></pre>
+
+  <p><strong>Configuration profile with explicit profile ID:</strong></p>
+  <pre><code>python3 linode_add_public_ipv6_interface.py \
+  --linode-id 88813501 \
+  --config-id 92318593 \
+  --dry-run</code></pre>
+
+  <p><strong>Fleet rollout:</strong></p>
+  <pre><code>python3 linode_add_public_ipv6_interface.py \
+  --csv webservers.csv \
+  --parallel 3 \
+  --bulk-rate-limit 2 \
+  --dry-run</code></pre>
+
+  <p>CSV format: <code>linode_id</code>, optional <code>config_id</code>, optional <code>firewall_id</code>.</p>
+
+  <h2>Operational recommendations</h2>
+  <ol>
+    <li>Validate transfer classification against the official Akamai Cloud Compute network transfer documentation for your region and service mix.</li>
+    <li>Run dry-run first on representative instances from each networking model in the fleet.</li>
+    <li>Document NodeBalancer IPv6 endpoints and update application or proxy configuration to prefer IPv6 for same-datacenter hops.</li>
+    <li>Monitor network transfer pools in Cloud Manager throughout the migration window.</li>
+    <li>Use rollback if an instance must revert to the pre-change interface layout.</li>
+  </ol>
+
+  <h2>When to apply this pattern</h2>
+  <h3>Appropriate</h3>
+  <ul>
+    <li>High-volume same-datacenter traffic between Linodes and NodeBalancers over public IPv4 today</li>
+    <li>VPC-first Linodes that require a second public interface for IPv6</li>
+    <li>Fleet-wide migrations with API-driven change control</li>
+  </ul>
+
+  <h3>Requires additional design</h3>
+  <ul>
+    <li>Workloads that must not use public addressing at all; evaluate VLAN or VPC routing alternatives</li>
+    <li>Cross-region NodeBalancer access, where different transfer rules apply</li>
+    <li>Environments where IPv6 path validation is not yet automated</li>
+  </ul>
+
+  <h2>Related documentation</h2>
+  <ul>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/network-transfer-usage-and-costs" target="_blank" rel="noopener">Network transfer usage and costs</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/an-overview-of-ipv6-on-linode" target="_blank" rel="noopener">IPv6 on Linodes</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/linode-interfaces" target="_blank" rel="noopener">Linode interfaces</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/select-network-interfaces-for-new-linodes" target="_blank" rel="noopener">Select network interfaces for new Linodes</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/getting-started-with-nodebalancers" target="_blank" rel="noopener">Getting started with NodeBalancers</a></li>
+  </ul>
+
+  <h2>About the author</h2>
+  <p><strong>Sandip Gangdhar</strong><br />Senior Technical Solutions Architect, Akamai Connected Cloud</p>
+
+  <footer>
+    <p>© 2026 Sandip Gangdhar • sandipgangdhar.com</p>
+    <p>This article describes a customer-informed architecture pattern and an open-source automation workflow. Transfer policies and API behavior are subject to change. Refer to official Akamai Cloud Compute documentation for authoritative guidance.</p>
+    <p><a href="../blog.html">← Back to Blog</a></p>
+  </footer>
+</main>
+</body>
+</html>
