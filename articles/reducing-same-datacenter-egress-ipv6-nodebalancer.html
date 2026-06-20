@@ -10,6 +10,7 @@
   <meta property="og:description" content="A practical architecture pattern and automation workflow for reducing same-datacenter egress on Akamai Cloud Compute." />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://sandipgangdhar.com/articles/reducing-same-datacenter-egress-ipv6-nodebalancer.html" />
+  <meta property="og:image" content="https://sandipgangdhar.com/images/architecture-overview.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.7; margin: 0; color: #172033; background: #f8fafc; }
@@ -102,6 +103,9 @@
 
   <p>The Application NodeBalancer was reached via its public IPv4 address because NodeBalancers expose public endpoints and do not provide a VPC-private front door comparable to an internal load balancer in some other environments. That design detail matters because same-datacenter public IPv4 traffic is classified differently from same-datacenter IPv6, VLAN, private IPv4, or VPC traffic.</p>
 
+  <img src="../images/architecture-overview.png" alt="Architecture overview showing End User, Akamai CDN, External NodeBalancer, Web Tier Linodes, Application NodeBalancer, and Application Tier Linodes with public IPv4 and IPv6 path classification" class="article-image" />
+  <p class="image-caption"><strong>Figure 1:</strong> Traffic flow and transfer classification. The optimization happens on the Web Tier Linodes to Application NodeBalancer path, where public IPv4 is replaced with public IPv6 for same-datacenter communication.</p>
+
   <div class="insight">
     <h2 style="border-top:0;padding-top:0;margin-top:0;">Key insight</h2>
     <p>The optimization described in this article does <strong>not</strong> require application code changes, VPC redesign, NodeBalancer modifications, or additional proxies and gateways.</p>
@@ -192,6 +196,29 @@ Application NodeBalancer
     <li><strong>Validate traffic and billing behavior.</strong> Test the IPv6 path and monitor Monthly Network Transfer for the web-tier Linodes.</li>
   </ol>
 
+  <h3>Cloud Manager screenshots: before and after</h3>
+  <p>The same design can be implemented using Cloud Manager. The screenshots below show the important states to validate during the change.</p>
+
+  <h4>Initial state: VPC-first Linode</h4>
+  <p>The starting point is a VPC-first Linode where the primary interface is attached to the VPC and the instance does not yet have a separate public IPv6 interface.</p>
+  <img src="../images/network-before-vpc.png" alt="Initial VPC-first Linode network configuration with eth0 attached to VPC and eth1 empty" class="article-image" />
+  <p class="image-caption"><strong>Figure 2:</strong> Initial state of a VPC-first Linode with a single VPC interface and optional 1:1 NAT enabled.</p>
+
+  <h4>Existing VPC interface details</h4>
+  <p>Before adding a public interface, record the current VPC IPv4, 1:1 NAT, and firewall settings. These settings should be preserved or restored by the automation.</p>
+  <img src="../images/network-vpc-interface-details.png" alt="Existing VPC interface configuration showing VPC IPv4, 1:1 NAT, and firewall selector" class="article-image" />
+  <p class="image-caption"><strong>Figure 3:</strong> Existing VPC interface configuration including private IPv4, 1:1 NAT, and firewall association.</p>
+
+  <h4>After state: dual-interface Linode</h4>
+  <p>After the change, the Linode has both the original VPC interface and a new Public Interface. The Public Interface provides the SLAAC IPv6 address used for same-datacenter communication with the Application NodeBalancer.</p>
+  <img src="../images/network-after-dual-interface.png" alt="Dual-interface Linode showing VPC interface and Public Interface with SLAAC IPv6 address" class="article-image" />
+  <p class="image-caption"><strong>Figure 4:</strong> Dual-interface Linode with a VPC interface for private networking and a Public Interface providing IPv6 connectivity for same-datacenter NodeBalancer communication.</p>
+
+  <h4>Route separation</h4>
+  <p>One important aspect of this design is route separation. IPv4 continues to use the VPC interface, while IPv6 uses the Public Interface.</p>
+  <img src="../images/network-route-separation.png" alt="Interface settings showing default IPv4 route through VPC interface and default IPv6 route through Public Interface" class="article-image" />
+  <p class="image-caption"><strong>Figure 5:</strong> Route separation where IPv4 continues to use the VPC interface while IPv6 traffic is routed through the Public Interface.</p>
+
   <p>Typical validation commands on the web-tier Linode are:</p>
 
   <pre><code>ip -6 addr
@@ -233,11 +260,11 @@ curl -6 http://[&lt;Application-NodeBalancer-IPv6&gt;]</code></pre>
   </div>
 
   <img src="../images/security-ipv6-firewall-design.png" alt="Security design for Public IPv6 interface with inbound traffic blocked and outbound IPv6 allowed" class="article-image" />
-  <p class="image-caption"><strong>Figure:</strong> Security design using a default-deny inbound firewall policy. Public IPv6 is used only for outbound communication with the Application NodeBalancer.</p>
+  <p class="image-caption"><strong>Figure 6:</strong> Security design using a default-deny inbound firewall policy. Public IPv6 is used only for outbound communication with the Application NodeBalancer.</p>
 
   <h2>Architecture diagrams</h2>
 
-  <h3>Figure 1 — Traffic path and transfer classification</h3>
+  <h3>Reference diagram — Traffic path and transfer classification</h3>
   <div class="diagram" aria-label="Production traffic path showing external NodeBalancer, web tier, application NodeBalancer, and transfer classification">
     <div class="arch">
       <div class="arch-row">
@@ -277,7 +304,7 @@ curl -6 http://[&lt;Application-NodeBalancer-IPv6&gt;]</code></pre>
     </div>
   </div>
 
-  <h3>Figure 2 — Dual-interface Linode target state</h3>
+  <h3>Reference diagram — Dual-interface Linode target state</h3>
   <div class="diagram" aria-label="Dual interface Linode target state">
     <div class="stack">
       <div class="row">
@@ -293,7 +320,7 @@ curl -6 http://[&lt;Application-NodeBalancer-IPv6&gt;]</code></pre>
     </div>
   </div>
 
-  <h3>Figure 3 — Automation workflow high level</h3>
+  <h3>Reference diagram — Automation workflow high level</h3>
   <div class="diagram" aria-label="Automation workflow">
     <div class="workflow">
       <div class="step"><span>1</span><strong>Discover</strong><br /><small>Get Linode details, status, config profile, and interface generation.</small></div>
