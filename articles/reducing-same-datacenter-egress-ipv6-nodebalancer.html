@@ -490,7 +490,44 @@ python3 linode_add_public_ipv6_interface.py \
     <li>Use rollback if an instance must revert to the pre-change interface layout.</li>
   </ol>
 
-  <h2>When to apply this pattern</h2>
+  
+  <h2>Results after implementation</h2>
+
+  <p>After implementing the solution and moving same-datacenter communication from <strong>Public IPv4</strong> to <strong>Public IPv6</strong>, the customer observed a significant reduction in metered network transfer.</p>
+
+  <h3>Network transfer comparison</h3>
+  <table>
+    <thead><tr><th>Metric</th><th>Before</th><th>After</th></tr></thead>
+    <tbody>
+      <tr><td>Daily Metered Egress</td><td>~32 TB/day</td><td>~4 TB/day</td></tr>
+      <tr><td>Same-Datacenter Web Tier → Application NodeBalancer Traffic</td><td>Public IPv4</td><td>Public IPv6</td></tr>
+      <tr><td>Application Architecture</td><td>Unchanged</td><td>Unchanged</td></tr>
+      <tr><td>VPC Design</td><td>Unchanged</td><td>Unchanged</td></tr>
+      <tr><td>Security Posture</td><td>Unchanged</td><td>Unchanged</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Observed outcome</h3>
+  <p>The most important observation was that the optimization required <strong>no application changes</strong>.</p>
+  <ul>
+    <li>The Web Tier remained unchanged.</li>
+    <li>The Application Tier remained unchanged.</li>
+    <li>Existing VPC networking remained unchanged.</li>
+    <li>Existing security policies remained unchanged.</li>
+  </ul>
+
+  <p>The <strong>only change</strong> was the communication path between the Web Tier and the Application NodeBalancer:</p>
+
+  <pre><code>Public IPv4
+      ↓
+Public IPv6</code></pre>
+
+  <p>This simple network path optimization resulted in an approximately <strong>87.5% reduction in metered egress</strong> for the observed workload, reducing daily metered transfer from <strong>~32 TB/day to ~4 TB/day</strong>.</p>
+
+  <p>The improvement was achieved <strong>without any application changes, VPC redesign, or modifications to the Application NodeBalancer</strong>, demonstrating how a small architectural adjustment can deliver significant operational and cost benefits.</p>
+
+
+<h2>When to apply this pattern</h2>
   <h3>Appropriate</h3>
   <ul>
     <li>High-volume same-datacenter traffic between Linodes and NodeBalancers over public IPv4 today</li>
@@ -507,7 +544,7 @@ python3 linode_add_public_ipv6_interface.py \
 
   <h2>Conclusion</h2>
   <p>Same-datacenter traffic is often assumed to be free or unmetered. However, the underlying network path matters.</p>
-  <p>In this case, changing the communication path from public IPv4 to public IPv6 allowed the customer to preserve the existing architecture while optimizing the transfer path.</p>
+  <p>In this case, changing the communication path from Public IPv4 to Public IPv6 reduced daily metered egress from approximately <strong>32 TB/day to 4 TB/day</strong>, while preserving the existing architecture.</p>
   <p>The VPC architecture remained unchanged. Security remained unchanged. The application remained unchanged. Only the network path changed.</p>
   <p>Sometimes, the simplest architectural changes deliver the most meaningful operational improvements.</p>
 
@@ -516,10 +553,10 @@ python3 linode_add_public_ipv6_interface.py \
     <ul>
       <li>Public IPv4 traffic within the same datacenter may still be metered.</li>
       <li>Public IPv6 between Linodes and NodeBalancers can provide an unmetered transfer path.</li>
-      <li>Existing VPC networking remains unchanged.</li>
+      <li>Existing VPC networking, security policies, and applications can remain unchanged.</li>
       <li>No inbound IPv6 ports need to be opened.</li>
       <li>The process can be fully automated using the open-source project.</li>
-      <li>Small network changes can create meaningful cost optimizations.</li>
+      <li>Small network path changes can deliver significant cost optimization.</li>
     </ul>
   </div>
 
