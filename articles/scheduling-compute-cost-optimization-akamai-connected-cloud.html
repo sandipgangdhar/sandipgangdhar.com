@@ -89,9 +89,15 @@ Released     →  capacity returned, state preserved elsewhere</code></pre>
 
   <h2>Understanding the capacity-reservation model</h2>
 
-  <p>Teams arriving from other cloud platforms sometimes assume that powering an instance down reduces its compute charge. On Akamai Connected Cloud the model is explicit and deliberate: the plan's resources stay allocated to the instance while it is powered off, so the instance is guaranteed to be there, unchanged, whenever it is powered back on. That guarantee has real operational value — there is no risk of a shutdown environment failing to return because capacity has been taken by someone else.</p>
+  <p>Teams arriving from other cloud platforms sometimes assume that powering an instance down reduces its compute charge. Akamai Connected Cloud documents its model explicitly. The <a href="https://techdocs.akamai.com/cloud-computing/docs/billing-faqs" target="_blank" rel="noopener">Billing FAQ</a> states it in one line:</p>
 
-  <p>Understanding this correctly is what makes the optimization obvious. If billing follows the reservation, then the way to stop paying for idle compute is to stop reserving it.</p>
+  <blockquote style="margin:18px 0;padding:14px 20px;border-left:4px solid #94a3b8;background:#f8fafc;border-radius:8px;color:#334155;">
+    <p style="margin:0;">“You pay for any service on your account, even if it's inactive or powered off. To stop additional charges, delete the service.”</p>
+  </blockquote>
+
+  <p>This is a deliberate design choice rather than an oversight. The plan's resources stay allocated to the instance while it is powered off, which is exactly why the instance is guaranteed to be there, unchanged, whenever it is powered back on. There is no risk of a shut-down environment failing to return because its capacity has been given to someone else — a guarantee with real operational value, and one that a model billing purely on power state could not make.</p>
+
+  <p>Understanding this correctly is what makes the optimization obvious, and the documentation points straight at it: if the service is what bills, then the way to stop paying for idle compute is to remove the service for the duration of the idle window — and to have built the environment so that doing so costs nothing in continuity.</p>
 
   <img src="../images/scheduler-billing-model.png" alt="Comparison of running, powered-off and compute-released instance states showing which resources remain reserved and which are released on Akamai Connected Cloud" class="article-image" />
   <p class="image-caption"><strong>Figure 1:</strong> What each instance state reserves and what it releases. Block Storage and the reserved IP are independent, persistent resources in every state — which is precisely what makes releasing the compute allocation safe.</p>
@@ -136,8 +142,8 @@ Released     →  capacity returned, state preserved elsewhere</code></pre>
   <div class="feature-card">
     <strong>Persistent resources carrying instance identity</strong>
     <div class="feature-grid">
-      <div><strong>Block Storage volumes</strong><br />A separate resource from the instance, billed per GB per month. Booting an instance from a Block Storage volume is a documented Linode pattern, intended for exactly this kind of "keep a bootable image and attach it when needed" workflow.</div>
-      <div><strong>Reserved IP addresses</strong><br />Once reserved, the address stays exclusive to the account within its region and can be reassigned to a newly created instance. This is what makes the returning environment reachable at the address people and systems already know.</div>
+      <div><strong>Block Storage volumes</strong><br />A separate resource from the instance, billed per GB per month. Booting from a Block Storage volume is a <a href="https://techdocs.akamai.com/cloud-computing/docs/boot-from-a-block-storage-volume" target="_blank" rel="noopener">documented Akamai pattern</a>, described there as “a low-cost way to maintain an image that can be quickly attached to a Linode and booted up when needed” — precisely this workflow.</div>
+      <div><strong>Reserved IP addresses</strong><br /><a href="https://techdocs.akamai.com/cloud-computing/docs/reserved-ips" target="_blank" rel="noopener">Reserved IPs</a> “keep the same address even if you delete the underlying Linode,” staying with the account until released and reassignable to a newly created instance. This is what makes the returning environment reachable at the address people and systems already know.</div>
       <div><strong>VPCs and VLANs</strong><br />Independent, persistent resources rather than properties of an instance. A VPC has a stable ID and subnet; a VLAN is a label on an interface. Both are reapplied to a new instance without any special preservation step.</div>
       <div><strong>Resource tags</strong><br />Tags applied directly to volumes and the reserved IP record which resources belong to which managed environment — Akamai's own live account state, used here as a recovery mechanism that cannot drift out of sync.</div>
     </div>
@@ -272,12 +278,14 @@ Released     →  capacity returned, state preserved elsewhere</code></pre>
 
   <h2>Related documentation</h2>
   <ul>
-    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/block-storage" target="_blank" rel="noopener">Block Storage on Akamai Connected Cloud</a></li>
-    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/boot-a-compute-instance-from-a-block-storage-volume" target="_blank" rel="noopener">Boot a compute instance from a Block Storage volume</a></li>
-    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses" target="_blank" rel="noopener">Managing IP addresses and IP reservation</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/billing-faqs" target="_blank" rel="noopener">Billing FAQ</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/understanding-how-billing-works" target="_blank" rel="noopener">Billing</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/block-storage" target="_blank" rel="noopener">Block Storage</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/boot-from-a-block-storage-volume" target="_blank" rel="noopener">Boot from a Block Storage volume</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/reserved-ips" target="_blank" rel="noopener">Reserved IPs</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses-on-a-compute-instance" target="_blank" rel="noopener">Manage IP addresses on a Linode</a></li>
+    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/vpc" target="_blank" rel="noopener">VPC</a></li>
     <li><a href="https://techdocs.akamai.com/cloud-computing/docs/linode-interfaces" target="_blank" rel="noopener">Linode interfaces</a></li>
-    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/vpc" target="_blank" rel="noopener">VPC on Akamai Connected Cloud</a></li>
-    <li><a href="https://techdocs.akamai.com/cloud-computing/docs/overview-of-billing-payments" target="_blank" rel="noopener">Billing and payments overview</a></li>
   </ul>
 
   <h2>About the author</h2>
