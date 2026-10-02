@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scheduling Compute on Akamai Connected Cloud: Cutting Idle Spend Without Losing Data, IP or Network Identity | Sandip Gangdhar</title>
+  <meta name="description" content="How to turn idle hours into savings on Akamai Connected Cloud by releasing compute capacity on a schedule while Block Storage, reserved IPs and VPC/VLAN configuration preserve the instance's identity." />
+  <meta name="keywords" content="Sandip Gangdhar, Akamai Connected Cloud, Linode, Cost Optimization, Instance Scheduler, Block Storage, Reserved IP, Cloud Architecture, Automation, FinOps" />
+  <meta name="author" content="Sandip Gangdhar" />
+  <link rel="canonical" href="https://sandipgangdhar.com/articles/scheduling-compute-cost-optimization-akamai-connected-cloud.html" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta property="og:title" content="Scheduling Compute on Akamai Connected Cloud: Cutting Idle Spend Without Losing Data, IP or Network Identity" />
+  <meta property="og:description" content="A production architecture for scheduled compute cost optimization on Akamai Connected Cloud, built from Block Storage, reserved IPs and persistent VPC/VLAN resources." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://sandipgangdhar.com/articles/scheduling-compute-cost-optimization-akamai-connected-cloud.html" />
+  <meta property="og:image" content="https://sandipgangdhar.com/images/scheduler-delete-recreate-lifecycle.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.7; margin: 0; color: #172033; background: #f8fafc; }
+    main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; background: #fff; }
+    a { color: #0f62fe; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back { display: inline-block; margin-bottom: 24px; color: #475569; }
+    h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 12px; color: #0f172a; }
+    h2 { margin-top: 44px; color: #0f172a; border-top: 1px solid #e2e8f0; padding-top: 28px; }
+    h3 { margin-top: 30px; color: #1e293b; }
+    .meta { color: #64748b; margin-bottom: 24px; }
+    .summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 18px 20px; border-radius: 8px; }
+    .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 16px 18px; border-radius: 8px; }
+    .callout { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px 18px; border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 10px; overflow-x: auto; }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    :not(pre) > code { background: #f1f5f9; padding: 2px 5px; border-radius: 4px; color: #334155; }
+    ul, ol { padding-left: 1.4rem; }
+    footer { margin-top: 48px; color: #64748b; font-size: 0.95rem; border-top: 1px solid #e2e8f0; padding-top: 24px; }
+    .article-image { width: 100%; border-radius: 14px; border: 1px solid #e2e8f0; margin: 18px 0 8px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08); }
+    .image-caption { color: #64748b; font-size: 0.92rem; margin: 0 0 28px; text-align: center; }
+    .insight { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 18px 20px; border-radius: 8px; margin: 20px 0; }
+    .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+    .ba-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; background: #fff; }
+    .ba-card h3 { margin-top: 0; }
+    .feature-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 18px 0; }
+    .feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin-top: 12px; }
+    .feature-grid div { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+    .takeaways { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 20px; }
+    @media (max-width: 700px) { .before-after, .feature-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) { h1 { font-size: 2rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Scheduling Compute on Akamai Connected Cloud: Cutting Idle Spend Without Losing Data, IP or Network Identity</h1>
+  <p class="meta">By Sandip Gangdhar • Akamai Connected Cloud • Cost Optimization • Automation • Platform Engineering</p>
+
+  <div class="summary">
+    <p><strong>Audience:</strong> Cloud architects, platform engineering teams, and infrastructure owners running non-production or time-bounded workloads on Akamai Connected Cloud.</p>
+    <p><strong>Summary:</strong> Development, test, staging, demo and batch environments rarely need to run twenty-four hours a day, yet they are commonly left running because taking them down safely is harder than it sounds. On Akamai Connected Cloud, compute capacity stays reserved for an instance while it is powered off — which is exactly why it returns instantly on the same plan — so the lever for idle-time savings is releasing that capacity, not toggling the power state. This article describes a production architecture that does so on a schedule, using Block Storage, reserved IPs and persistent VPC/VLAN resources to preserve everything that makes an instance <em>that</em> instance, and covers the engineering required to make the cycle genuinely repeatable.</p>
+  </div>
+
+  <h2>Architecture and business context</h2>
+
+  <p>Most enterprise cloud estates contain a substantial tier of workloads that are only needed some of the time. Development environments matter during working hours. Staging matters before a release. Demo environments matter when there is a demo. Batch and CI runners matter when there is a queue. Performance test rigs matter for the duration of a test.</p>
+
+  <p>In practice these environments tend to run continuously anyway, and the reason is rarely carelessness. It is that stopping them has historically been risky. Someone has to be confident the environment will come back exactly as it was — same address, same data, same network placement, same access — and when that confidence is missing, the safe choice is to leave everything running. Idle capacity is the price paid for predictability.</p>
+
+  <p>Akamai Connected Cloud provides the primitives to remove that trade-off. Block Storage volumes, reserved IP addresses, VPCs and VLANs are all first-class resources with lifecycles independent of any individual compute instance. An instance's durable identity can therefore live entirely in resources that are not affected when the compute resource itself is released. That is the foundation this architecture is built on.</p>
+
+  <div class="insight">
+    <h2 style="border-top:0;padding-top:0;margin-top:0;">Key insight</h2>
+    <p>On Akamai Connected Cloud, an instance's compute allocation — vCPU, RAM and network capacity — remains reserved for you while the instance is powered off. That reservation is what guarantees the instance powers straight back on, on the same plan, with no capacity contention. Billing follows the reservation rather than the power state.</p>
+    <p>The savings lever is therefore not the power button, but the allocation itself:</p>
+    <pre><code>Powered off  →  capacity still reserved for you
+Released     →  capacity returned, state preserved elsewhere</code></pre>
+    <p>Because Block Storage, reserved IPs and VPC/VLAN membership are independent resources, releasing the compute allocation during a genuinely idle window costs nothing in continuity. The instance is reconstructed from recorded state when it is next needed — same address, same disks, same network, same host identity.</p>
+  </div>
+
+  <h2>Understanding the capacity-reservation model</h2>
+
+  <p>Teams arriving from other cloud platforms sometimes assume that powering an instance down reduces its compute charge. Akamai Connected Cloud documents its model explicitly. The <a href="https://techdocs.akamai.com/cloud-computing/docs/billing-faqs" target="_blank" rel="noopener">Billing FAQ</a> states it in one line:</p>
+
+  <blockquote style="margin:18px 0;padding:14px 20px;border-left:4px solid #94a3b8;background:#f8fafc;border-radius:8px;color:#334155;">
+    <p style="margin:0;">“You pay for any service on your account, even if it's inactive or powered off. To stop additional charges, delete the service.”</p>
+  </blockquote>
+
+  <p>This is a deliberate design choice rather than an oversight. The plan's resources stay allocated to the instance while it is powered off, which is exactly why the instance is guaranteed to be there, unchanged, whenever it is powered back on. There is no risk of a shut-down environment failing to return because its capacity has been given to someone else — a guarantee with real operational value, and one that a model billing purely on power state could not make.</p>
+
+  <p>Understanding this correctly is what makes the optimization obvious, and the documentation points straight at it: if the service is what bills, then the way to stop paying for idle compute is to remove the service for the duration of the idle window — and to have built the environment so that doing so costs nothing in continuity.</p>
+
+  <img src="../images/scheduler-billing-model.png" alt="Comparison of running, powered-off and compute-released instance states showing which resources remain reserved and which are released on Akamai Connected Cloud" class="article-image" />
+  <p class="image-caption"><strong>Figure 1:</strong> What each instance state reserves and what it releases. Block Storage and the reserved IP are independent, persistent resources in every state — which is precisely what makes releasing the compute allocation safe.</p>
+
+  <h2>The optimization opportunity</h2>
+
+  <p>Expressed as a scheduling problem, the opportunity is straightforward. A week contains 168 hours. An environment needed on weekdays from 09:00 to 18:00 is genuinely required for 45 of them. The remaining 123 hours — roughly <strong>73% of the week</strong> — are idle time during which the compute allocation serves no purpose.</p>
+
+  <ul>
+    <li><strong>Always on</strong> — 168 hours of compute reserved per week, 0 idle hours avoided, <strong>0%</strong> of the week with compute released.</li>
+    <li><strong>Weekdays 08:00–20:00</strong> — 60 hours reserved, 108 idle hours avoided, <strong>~64%</strong> of the week with compute released.</li>
+    <li><strong>Weekdays 09:00–18:00</strong> — 45 hours reserved, 123 idle hours avoided, <strong>~73%</strong> of the week with compute released.</li>
+    <li><strong>Weekdays 09:00–17:00</strong> — 40 hours reserved, 128 idle hours avoided, <strong>~76%</strong> of the week with compute released.</li>
+  </ul>
+
+  <p>These percentages describe avoided compute reservation, not a total bill reduction. Block Storage continues to bill per GB per month for the volumes holding the environment's operating system and data, and a reserved IP carries a small idle charge. Both are ongoing regardless of instance state — they are the cost of guaranteeing the environment returns identical, and both are modest relative to a reserved compute plan. The effect is most pronounced on larger plans, where the compute allocation dominates and the storage footprint does not scale with it.</p>
+
+  <div class="note">
+    <p><strong>A note on measurement.</strong> Account-level pricing varies, so this architecture deliberately reports savings as a percentage of avoided compute reservation rather than a currency figure. Two numbers are exposed: a <em>configured</em> figure computed directly from a schedule's own rules the moment it is set, and an <em>actual</em> figure reconstructed from real transition history once the schedule has been running. The second is the honest one, and it is deliberately not shown until at least one full cycle of history exists.</p>
+  </div>
+
+  <h2>The pattern: capture, release, reconstruct</h2>
+
+  <p>The mechanism is a controlled cycle. On a scheduled stop, the instance's complete configuration is captured, the compute resource is released, and every persistent resource is left untouched. On a scheduled start, a new instance is created in the same region on the same plan, the captured configuration is replayed onto it, the same volumes are reattached in the same device order, the same reserved IP is assigned, and reachability is verified before the operation is reported as successful.</p>
+
+  <p>From the environment owner's perspective this behaves like stop and start. The address they connect to does not change. Their data is where they left it. Their SSH client does not warn about a changed host identity. What changes underneath is the compute resource itself, which is rebuilt from a recorded specification each cycle.</p>
+
+  <img src="../images/scheduler-delete-recreate-lifecycle.png" alt="Three-phase lifecycle diagram showing capture of instance configuration, release of the compute resource, and reconstruction from recorded state, with the persistent resources that survive each cycle" class="article-image" />
+  <p class="image-caption"><strong>Figure 2:</strong> One scheduled cycle. Configuration is re-captured before every release, so a change made out-of-band between cycles is carried forward rather than silently reverted.</p>
+
+  <p>One design decision deserves emphasis: configuration is re-captured <em>before every release</em>, not once at onboarding. If an owner attaches a VLAN through Cloud Manager, renames the instance, adds a tag or attaches another data volume while it is running, that change is part of the next capture and survives the next cycle. A design that captured once would quietly revert the environment to its original shape the first time it cycled — a failure mode that would erode trust far faster than any saving could justify.</p>
+
+  <h2>What makes it safe: the platform primitives</h2>
+
+  <p>The pattern is only viable because Akamai Connected Cloud exposes the right independent resources. Each one carries a specific part of the instance's identity.</p>
+
+  <div class="feature-card">
+    <strong>Persistent resources carrying instance identity</strong>
+    <div class="feature-grid">
+      <div><strong>Block Storage volumes</strong><br />A separate resource from the instance, billed per GB per month. Booting from a Block Storage volume is a <a href="https://techdocs.akamai.com/cloud-computing/docs/boot-from-a-block-storage-volume" target="_blank" rel="noopener">documented Akamai pattern</a>, described there as “a low-cost way to maintain an image that can be quickly attached to a Linode and booted up when needed” — precisely this workflow.</div>
+      <div><strong>Reserved IP addresses</strong><br /><a href="https://techdocs.akamai.com/cloud-computing/docs/reserved-ips" target="_blank" rel="noopener">Reserved IPs</a> “keep the same address even if you delete the underlying Linode,” staying with the account until released and reassignable to a newly created instance. This is what makes the returning environment reachable at the address people and systems already know.</div>
+      <div><strong>VPCs and VLANs</strong><br />Independent, persistent resources rather than properties of an instance. A VPC has a stable ID and subnet; a VLAN is a label on an interface. Both are reapplied to a new instance without any special preservation step.</div>
+      <div><strong>Resource tags</strong><br />Tags applied directly to volumes and the reserved IP record which resources belong to which managed environment — Akamai's own live account state, used here as a recovery mechanism that cannot drift out of sync.</div>
+    </div>
+  </div>
+
+  <p>Reserved IPs are region-locked to where they were first reserved, which is a design constraint to architect around rather than an obstacle: the engine always recreates an instance in its original region, which is correct behaviour for a scheduled environment in any case.</p>
+
+  <h2>Technical deep dive: what makes the cycle reliable</h2>
+
+  <p>Releasing and recreating an instance is straightforward to describe and considerably harder to make dependable enough to run unattended, twice a day, indefinitely. The following are the design decisions that mattered most, each established by live testing against the Linode API rather than inferred from documentation alone.</p>
+
+  <h3>Two interface models, captured verbatim</h3>
+
+  <p>Akamai Connected Cloud supports two networking configuration models, and an instance uses one or the other for its lifetime. Under the legacy model, interfaces are part of the boot configuration profile. Under the newer Linode Interfaces model, they exist independently at the instance level, with structurally different field shapes — public addresses become a list, 1:1 NAT moves to a per-address property, and an explicit flag marks which interface carries the default route.</p>
+
+  <p>The two shapes do not normalise cleanly into shared flat columns without losing information. The engine therefore records the model identifier verbatim and stores the interface list in whichever shape matches, then dispatches on that value at replay time. Nothing is translated into an intermediate representation, because every translation layer is somewhere a detail can be silently dropped — and a silently dropped networking detail reappears as an environment that comes back subtly different from the one that went away.</p>
+
+  <h3>The guest must not have to discover its own network</h3>
+
+  <p>This was the most instructive problem in the build. A persistent OS volume carries a network configuration written when that disk last booted. Booted later as a different instance, the guest can come up with the API reporting it as running while it is not actually reachable, because the configuration on disk no longer matches the address it has been given.</p>
+
+  <p>Two approaches were evaluated and rejected with evidence. Reverting the guest to DHCP works, but gives up static control over exactly what sits on each interface. Having the guest query the metadata service at boot has a genuine bootstrap problem: reaching that service depends on routing the guest does not yet have.</p>
+
+  <p>The approach that works inverts the responsibility. The orchestrator already knows the exact address, gateway and subnet for every interface, because it assigned them. It does not need the guest to discover anything. It composes a small cloud-config, passes it as user data at create time, and <code>cloud-init</code> writes the correct network configuration and restarts networking on that same boot. Because this runs after the platform's own early-boot configuration step, it reliably takes effect without conflicting with anything.</p>
+
+  <div class="callout">
+    <p><strong>The general lesson.</strong> When an orchestrator already holds the authoritative value, having the guest rediscover it introduces a dependency on the very thing that may be broken. Push known state in; do not ask for it back.</p>
+  </div>
+
+  <h3>Stable host identity across cycles</h3>
+
+  <p>A newly created instance would normally regenerate its SSH host keys on first boot, which would present a changed host identity at the same address on every scheduled restart — an alarming and, repeated daily, actively harmful signal to teach people to ignore. The same user-data mechanism instructs <code>cloud-init</code> to preserve the host keys already present on the persistent volume. The environment returns with the identity it had, and a genuine key change remains meaningful. A host-key mismatch is treated as a security event that halts the operation rather than a condition to work around.</p>
+
+  <h3>Assign the reserved address at creation, not after</h3>
+
+  <p>An instance requires at least one public address, and the platform will not allow its last one to be removed. Creating an instance and then attempting to exchange its automatically assigned address for the reserved one is therefore the wrong sequence. Passing the reserved address in the creation call instead makes it the instance's address from the outset, which is both simpler and the only clean path.</p>
+
+  <h3>Confirm detachment before releasing</h3>
+
+  <p>Volume detachment is asynchronous. Issuing a detach and proceeding immediately to release the instance can race, leaving a volume briefly associated with an instance that no longer exists until a retry resolves it. The shutdown path therefore polls until each detachment is confirmed, with retry, before continuing. Observed behaviour, not theory — the account event log showed exactly this race during testing.</p>
+
+  <h3>Success is verified, not assumed</h3>
+
+  <p>An instance reporting as running through the API is not the same as an instance a user can reach. The engine records a newly created instance as <em>unreachable</em> first — it is real and billing, so every guard elsewhere needs to know it exists — and only promotes it to running after an independent network reachability check succeeds. A retried start re-checks the existing instance rather than creating a second one, so a transient failure cannot quietly leave an orphaned, billing instance behind.</p>
+
+  <h3>Roll back partial work</h3>
+
+  <p>Creation spans several sequential API calls. A failure partway through rolls the sequence back and removes the half-built instance, rather than leaving an unregistered resource consuming capacity. Combined with per-instance locking — which prevents a manual start from racing a scheduled stop — this is what makes the cycle safe to automate rather than merely possible to script.</p>
+
+  <h2>From engine to product: scheduling</h2>
+
+  <p>A reliable release-and-reconstruct engine is the hard half. Making it something an environment owner can operate themselves is the half that determines whether it gets adopted.</p>
+
+  <p>Schedules are expressed as day and time rules against an IANA timezone — never a fixed UTC offset — so a 09:00 window remains 09:00 local across a daylight-saving transition. A poller evaluates every managed environment on a short interval, resolves the applicable schedule, and enforces it.</p>
+
+  <img src="../images/scheduler-schedule-resolution.png" alt="Diagram of the poller tick showing override precedence between individual and group schedules, the idempotency, locking and daylight-saving guards, and the manual override auto-revert flow" class="article-image" />
+  <p class="image-caption"><strong>Figure 3:</strong> Schedule resolution and the guards around it. Precedence is a strict override rather than a merge, so the applicable schedule for any environment is never ambiguous.</p>
+
+  <h3>Groups, with unambiguous precedence</h3>
+
+  <p>One schedule usually applies to a set of environments rather than one — an entire development estate moves together. Groups provide that, with membership limited to one group per environment and enforced at the schema level. Precedence is a strict override: an environment with its own enabled schedule follows it and ignores its group entirely; otherwise the group's schedule applies; and if neither exists, nothing happens automatically. Rules are never merged, because a merged schedule is one nobody can reason about at a glance.</p>
+
+  <h3>Manual override that cannot be forgotten</h3>
+
+  <p>Someone will always need an environment outside its window, and a system that makes that difficult gets disabled. Starting an environment out of hours is therefore a first-class operation — it simply arms a countdown, two hours by default. The remaining time is visible in status output, can be extended deliberately, and if nobody touches it the poller returns the environment to its schedule.</p>
+
+  <p>This closes the failure mode that quietly undermines most scheduling efforts: a Friday afternoon manual start that nobody remembers, running the entire weekend. An environment with no schedule at all never gets a timer, so purely manual environments stay manual.</p>
+
+  <h3>An audit trail that answers the real question</h3>
+
+  <p>Every transition is recorded with its trigger and result. That record serves three purposes: it answers the support question directly — <em>why was my environment down at 09:00?</em> — it provides the idempotency check that stops a repeated poller tick firing the same transition twice, and it is the history from which the actual-savings percentage is reconstructed.</p>
+
+  <h2>Operating it: recovery and deployment</h2>
+
+  <h3>Recovery that does not depend on the tool's own database</h3>
+
+  <p>A scheduler holds one piece of information that cannot be recovered from the platform by inspection: which volumes, and which reserved IP, belong to which named environment. Everything else can be re-read live.</p>
+
+  <p>That mapping is therefore not kept only in the tool's local database. It is mirrored onto the resources themselves as tags — additive, never replacing an owner's own tags — so the registry can be reconstructed by scanning the account. This is deliberately not a periodic snapshot: reading tags returns live account state, which cannot be stale the way a backup can. An optional object-storage layer covers the richer configuration that tags cannot structurally hold, written and read back to verify, and reconciled in full on the next cycle rather than patched incrementally.</p>
+
+  <h3>Self-hosted, in the customer's own account</h3>
+
+  <p>The deployment model is one instance of the tool per account, running against that account's own API token. There is no shared multi-tenant service, and no infrastructure detail or usage data leaves the customer's environment. Where a browser interface is used, sign-in is through Linode's own OAuth, with each customer registering their own OAuth client — the login answers only who the user is and is never used to call the platform API. The token that does call the API is configured once, on infrastructure the customer controls.</p>
+
+  <p>It runs either as services on a single host, or as a container on an existing LKE cluster, with identical application behaviour. Three interfaces sit on one shared implementation — a command-line tool, a REST API and a web dashboard — so they cannot disagree about what a schedule means.</p>
+
+  <h2>Bringing an existing environment under management</h2>
+
+  <p>An environment built normally has its operating system on local disk, which is tied to the instance's lifecycle. Bringing it under management requires moving that operating system onto a Block Storage volume once. This is a single scheduled maintenance window, performed with the environment's data preserved, after which the environment cycles with no further downtime beyond the scheduled windows themselves.</p>
+
+  <p>Environments provisioned from a prepared volume template start managed and skip this step. The one-time migration is also where a pre-flight check belongs: confirming the operating system can apply the user-data mechanism the recreate path depends on, before the first automated cycle rather than after.</p>
+
+  <h2>When to apply this pattern</h2>
+
+  <h3>Appropriate</h3>
+  <ul>
+    <li>Development, test, staging, demo and training environments with predictable working-hours usage</li>
+    <li>Batch, CI and performance-test capacity that is idle between runs</li>
+    <li>Fleets large enough that a consistent schedule across a group is worth more than per-instance attention</li>
+    <li>Workloads where a short, bounded start-up time at the beginning of a window is acceptable</li>
+  </ul>
+
+  <h3>Requires additional design</h3>
+  <ul>
+    <li>Production workloads with availability commitments — this pattern is for deliberately idle capacity, not resilience</li>
+    <li>Environments that must respond instantly at any hour, where reconstruction time is not acceptable</li>
+    <li>Very large single-volume storage footprints, which need a storage design that accounts for per-volume limits</li>
+    <li>Workloads whose economics are dominated by storage rather than compute, where the percentage saved will be smaller</li>
+  </ul>
+
+  <h2>Conclusion</h2>
+
+  <p>Idle non-production capacity is one of the most common and most tractable sources of avoidable cloud spend, and it persists not because teams are unaware of it but because stopping environments safely has historically been harder than leaving them running.</p>
+
+  <p>Akamai Connected Cloud's resource model removes that obstacle. Because Block Storage, reserved IPs and VPC/VLAN membership are independent of the compute resource, an environment's identity can survive the release of its compute allocation entirely intact. Everything else is engineering discipline: capture configuration faithfully, replay it exactly, verify rather than assume, and make the schedule something an owner can reason about and override without defeating it.</p>
+
+  <p>The result is that an environment needed for 45 hours a week can reserve compute for 45 hours a week — and still be at the same address, with the same data, when its owner arrives on Monday morning.</p>
+
+  <h2>Key takeaways</h2>
+  <div class="takeaways">
+    <ul>
+      <li>Compute capacity stays reserved while an instance is powered off, which guarantees it returns on the same plan — so the savings lever is the allocation, not the power state.</li>
+      <li>Block Storage, reserved IPs and VPC/VLAN resources are independent of the instance lifecycle, which is what allows an environment's identity to survive a release-and-reconstruct cycle.</li>
+      <li>Re-capture configuration before every release, so out-of-band changes are carried forward rather than silently reverted.</li>
+      <li>Push known network state into the guest at creation rather than asking the guest to discover it.</li>
+      <li>Preserve SSH host identity, or teach people to ignore the warning that matters.</li>
+      <li>Verify reachability independently; an API reporting <em>running</em> is not the same as an environment someone can reach.</li>
+      <li>Manual override with automatic revert is what stops a scheduling system from being quietly switched off.</li>
+      <li>A weekday 09:00–18:00 schedule releases compute for roughly 73% of the week.</li>
+    </ul>
+  </div>
+
+  <h2>Related documentation</h2>
+  <p>Billing: <a href="https://techdocs.akamai.com/cloud-computing/docs/billing-faqs">Billing FAQ</a> · <a href="https://techdocs.akamai.com/cloud-computing/docs/understanding-how-billing-works">Billing</a></p>
+  <p>Storage: <a href="https://techdocs.akamai.com/cloud-computing/docs/block-storage">Block Storage</a> · <a href="https://techdocs.akamai.com/cloud-computing/docs/boot-from-a-block-storage-volume">Boot from a Block Storage volume</a></p>
+  <p>Addressing: <a href="https://techdocs.akamai.com/cloud-computing/docs/reserved-ips">Reserved IPs</a> · <a href="https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses-on-a-compute-instance">Manage IP addresses on a Linode</a></p>
+  <p>Networking: <a href="https://techdocs.akamai.com/cloud-computing/docs/vpc">VPC</a> · <a href="https://techdocs.akamai.com/cloud-computing/docs/linode-interfaces">Linode interfaces</a></p>
+
+  <h2>About the author</h2>
+  <p><strong>Sandip Gangdhar</strong><br />Senior Technical Solutions Architect at Akamai Connected Cloud specializing in Kubernetes, networking, cloud migration, platform engineering, and infrastructure automation.</p>
+
+  <h3>Connect with me</h3>
+  <p>Website: <a href="https://sandipgangdhar.com">sandipgangdhar.com</a></p>
+  <p>GitHub: <a href="https://github.com/sandipgangdhar">github.com/sandipgangdhar</a></p>
+  <p>Project: <a href="https://github.com/sandipgangdhar/linode-instance-scheduler">linode-instance-scheduler</a></p>
+  <p>LinkedIn: <a href="https://www.linkedin.com/in/ssandippggangdhar">linkedin.com/in/ssandippggangdhar</a></p>
+
+  <footer>
+    <p>© 2026 Sandip Gangdhar • sandipgangdhar.com</p>
+    <p>This article describes an architecture pattern built on documented Akamai Connected Cloud capabilities. Platform features, billing details and API behaviour may evolve over time. Readers should refer to official Akamai Connected Cloud documentation for authoritative guidance, and validate savings estimates against their own account pricing and usage.</p>
+    <p>Views expressed are the author's own.</p>
+  </footer>
+</main>
+</body>
+</html>
